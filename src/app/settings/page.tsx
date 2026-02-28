@@ -18,6 +18,8 @@ export default function SettingsPage() {
   const [toast, setToast] = useState<string | null>(null);
   const [exportingCsv, setExportingCsv] = useState(false);
   const [deleteConfirm, setDeleteConfirm] = useState(false);
+  const [deleteCatTarget, setDeleteCatTarget] = useState<PersonalCategory | null>(null);
+  const [deletingCat, setDeletingCat] = useState(false);
 
   useEffect(() => { loadData(); }, []);
 
@@ -79,6 +81,16 @@ export default function SettingsPage() {
   const toggleCategory = async (id: string, active: boolean) => {
     await supabase.from("personal_categories").update({ is_active: active }).eq("id", id);
     setCategories(categories.map((c) => c.id === id ? { ...c, is_active: active } : c));
+  };
+
+  const deleteCategory = async (id: string) => {
+    setDeletingCat(true);
+    const { error } = await supabase.from("personal_categories").delete().eq("id", id);
+    if (!error) {
+      setCategories(categories.filter((c) => c.id !== id));
+    }
+    setDeletingCat(false);
+    setDeleteCatTarget(null);
   };
 
   const updateBudget = async (id: string, amount: number | null) => {
@@ -270,6 +282,12 @@ export default function SettingsPage() {
                 >
                   <span className={`block w-3.5 h-3.5 rounded-full bg-white shadow transition-transform ${cat.is_active ? "translate-x-4" : "translate-x-0.5"}`} />
                 </button>
+                <button
+                  onClick={() => setDeleteCatTarget(cat)}
+                  className="text-xs text-red-400 hover:text-red-600"
+                >
+                  削除
+                </button>
               </div>
             </div>
           ))}
@@ -330,6 +348,27 @@ export default function SettingsPage() {
       {toast && (
         <div className="fixed top-4 left-1/2 -translate-x-1/2 bg-gray-800 text-white px-6 py-3 rounded-full text-sm font-bold shadow-xl z-50">
           {toast}
+        </div>
+      )}
+
+      {/* Delete Category Confirmation */}
+      {deleteCatTarget && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 px-6">
+          <div className="bg-white rounded-2xl p-6 w-full max-w-sm space-y-4">
+            <h2 className="text-base font-bold text-gray-800">カテゴリの削除</h2>
+            <p className="text-sm text-gray-600">
+              「{deleteCatTarget.icon} {deleteCatTarget.name}」を完全に削除しますか？<br />
+              この操作は取り消せません。
+            </p>
+            <div className="flex gap-3">
+              <button onClick={() => setDeleteCatTarget(null)} disabled={deletingCat}
+                className="flex-1 py-2.5 rounded-xl text-sm font-bold bg-gray-100 text-gray-700">キャンセル</button>
+              <button onClick={() => deleteCategory(deleteCatTarget.id)} disabled={deletingCat}
+                className="flex-1 py-2.5 rounded-xl text-sm font-bold bg-red-500 text-white disabled:opacity-50">
+                {deletingCat ? "削除中..." : "削除する"}
+              </button>
+            </div>
+          </div>
         </div>
       )}
 
