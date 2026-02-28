@@ -5,9 +5,7 @@ import { supabase } from "@/lib/supabase";
 import type { PersonalCategory } from "@/lib/supabase";
 
 const PAYMENT_METHODS = [
-  { key: "cash", label: "現金", icon: "💴" },
-  { key: "e-pay", label: "電子決済", icon: "📱" },
-  { key: "ic-card", label: "交通IC", icon: "🚃" },
+  { key: "cash", label: "現金等", icon: "💴" },
   { key: "credit", label: "クレカ", icon: "💳" },
 ];
 
@@ -18,7 +16,7 @@ export default function RecordPage() {
     if (typeof window !== "undefined") {
       return localStorage.getItem("lastPaymentMethod") || "e-pay";
     }
-    return "e-pay";
+    return "cash";
   });
   const [date, setDate] = useState(() => new Date().toISOString().split("T")[0]);
   const [memo, setMemo] = useState("");
@@ -113,12 +111,12 @@ export default function RecordPage() {
       {/* Payment Method */}
       <div className="bg-white rounded-2xl p-4 shadow-sm">
         <label className="text-xs text-gray-500 block mb-3">支払い方法</label>
-        <div className="grid grid-cols-4 gap-1.5">
+        <div className="grid grid-cols-2 gap-2">
           {PAYMENT_METHODS.map((pm) => (
             <button
               key={pm.key}
               onClick={() => setPaymentMethod(pm.key)}
-              className={`py-2 rounded-xl text-xs font-bold transition ${
+              className={`py-3 rounded-xl text-sm font-bold transition ${
                 paymentMethod === pm.key
                   ? "bg-emerald-600 text-white"
                   : "bg-gray-50 text-gray-600"

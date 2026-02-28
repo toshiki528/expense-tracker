@@ -73,7 +73,7 @@ export default function AnalysisPage() {
   });
 
   const PAYMENT_LABELS: Record<string, string> = {
-    cash: "💴現金", "e-pay": "📱電子決済", "ic-card": "🚃IC", credit: "💳クレカ",
+    cash: "💴現金等", credit: "💳クレカ",
   };
 
   if (loading) {
