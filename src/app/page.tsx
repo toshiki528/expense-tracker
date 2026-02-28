@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useRef } from "react";
 import { supabase } from "@/lib/supabase";
 import type { PersonalExpense, PersonalSettings, PersonalCategory } from "@/lib/supabase";
 import { getCurrentPeriod, getAdjacentPeriod, getRemainingDays, getPreviousPeriodMonth } from "@/lib/salary-cycle";
@@ -15,6 +15,9 @@ export default function HomePage() {
   const [utilityTotal, setUtilityTotal] = useState(0);
   const [savingsAmount, setSavingsAmount] = useState(0);
   const [loading, setLoading] = useState(true);
+  const [editingIncome, setEditingIncome] = useState(false);
+  const [incomeInput, setIncomeInput] = useState("");
+  const incomeRef = useRef<HTMLInputElement>(null);
 
   const loadData = useCallback(async () => {
     setLoading(true);
@@ -91,6 +94,24 @@ export default function HomePage() {
     setPeriod(next);
   };
 
+  const startEditIncome = () => {
+    setIncomeInput(String(settings?.monthly_income || ""));
+    setEditingIncome(true);
+    setTimeout(() => incomeRef.current?.focus(), 50);
+  };
+
+  const saveIncome = async () => {
+    const val = parseInt(incomeInput) || 0;
+    if (settings) {
+      await supabase.from("personal_settings").update({
+        monthly_income: val,
+        updated_at: new Date().toISOString(),
+      }).eq("id", settings.id);
+      setSettings({ ...settings, monthly_income: val });
+    }
+    setEditingIncome(false);
+  };
+
   const income = settings?.monthly_income || 0;
   const fixedMyShare = Math.floor(fixedTotal / 2);
   const utilityMyShare = Math.floor(utilityTotal / 2);
@@ -134,9 +155,29 @@ export default function HomePage() {
       <div className="bg-white rounded-2xl p-4 shadow-sm space-y-2">
         <h2 className="text-xs font-bold text-gray-500 mb-2">今月のお金の流れ</h2>
 
-        <div className="flex justify-between text-sm">
+        <div className="flex justify-between items-center text-sm">
           <span className="text-gray-600">手取り収入</span>
-          <span className="font-bold">¥{income.toLocaleString()}</span>
+          {editingIncome ? (
+            <div className="flex items-center gap-1">
+              <span className="text-gray-400">¥</span>
+              <input
+                ref={incomeRef}
+                type="number"
+                inputMode="numeric"
+                value={incomeInput}
+                onChange={(e) => setIncomeInput(e.target.value)}
+                onBlur={saveIncome}
+                onKeyDown={(e) => e.key === "Enter" && saveIncome()}
+                className="w-28 text-right font-bold border-b-2 border-emerald-500 outline-none bg-transparent"
+                style={{ fontSize: "16px" }}
+              />
+            </div>
+          ) : (
+            <button onClick={startEditIncome} className="font-bold text-gray-800 flex items-center gap-1">
+              ¥{income.toLocaleString()}
+              <span className="text-[10px] text-gray-400">✎</span>
+            </button>
+          )}
         </div>
         <div className="border-t border-dashed border-gray-200 my-1" />
 
