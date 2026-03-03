@@ -2,14 +2,12 @@
 
 import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase";
-import type { PersonalSettings, PersonalCategory, FixedCost } from "@/lib/supabase";
-import { getCurrentPeriod, getPreviousPeriodMonth } from "@/lib/salary-cycle";
+import type { PersonalSettings, PersonalCategory } from "@/lib/supabase";
+import { getCurrentPeriod } from "@/lib/salary-cycle";
 
 export default function SettingsPage() {
   const [settings, setSettings] = useState<PersonalSettings | null>(null);
   const [categories, setCategories] = useState<PersonalCategory[]>([]);
-  const [fixedCosts, setFixedCosts] = useState<FixedCost[]>([]);
-  const [utilities, setUtilities] = useState<{ type: string; amount: number }[]>([]);
   const [savingsFromKakeibo, setSavingsFromKakeibo] = useState<number | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -25,27 +23,19 @@ export default function SettingsPage() {
 
   async function loadData() {
     const period = getCurrentPeriod();
-    const prev = getPreviousPeriodMonth();
-    const prevPeriodStr = `${prev.year}-${String(prev.month).padStart(2, "0")}`;
 
     const [
       { data: s },
       { data: cats },
-      { data: fixed },
-      { data: utils },
       { data: savData },
     ] = await Promise.all([
       supabase.from("personal_settings").select("*").limit(1).single(),
       supabase.from("personal_categories").select("*").order("sort_order"),
-      supabase.from("fixed_costs").select("*").eq("is_active", true).order("sort_order"),
-      supabase.from("utility_bills").select("type,amount").eq("period", prevPeriodStr),
       supabase.from("monthly_savings").select("amount").eq("year", period.year).eq("month", period.month).eq("person", "俊樹").single(),
     ]);
 
     setSettings(s as PersonalSettings);
     setCategories(cats || []);
-    setFixedCosts(fixed || []);
-    setUtilities(utils || []);
     setSavingsFromKakeibo(savData?.amount ?? null);
     setLoading(false);
   }
@@ -126,10 +116,6 @@ export default function SettingsPage() {
     showToast("全データを削除しました");
   };
 
-  const fixedTotal = fixedCosts.reduce((s, c) => s + c.amount, 0);
-  const utilityTotal = utilities.reduce((s, u) => s + u.amount, 0);
-  const TYPE_LABELS: Record<string, string> = { electric: "電気", gas: "ガス", water: "水道" };
-
   if (loading) {
     return (
       <div className="flex items-center justify-center h-64">
@@ -201,57 +187,6 @@ export default function SettingsPage() {
               />
             </div>
           </div>
-        )}
-      </div>
-
-      {/* Fixed Costs (Read-only) */}
-      <div className="bg-white rounded-2xl p-4 shadow-sm space-y-3">
-        <div className="flex items-center justify-between">
-          <h2 className="text-sm font-bold text-gray-700">固定費</h2>
-          <span className="text-[10px] text-emerald-500 bg-emerald-50 px-2 py-0.5 rounded-full">ワリカンから自動取得</span>
-        </div>
-        <div className="space-y-1">
-          {fixedCosts.map((c) => (
-            <div key={c.id} className="flex justify-between text-sm">
-              <span className="text-gray-600">{c.name}</span>
-              <span className="text-gray-700">¥{c.amount.toLocaleString()}</span>
-            </div>
-          ))}
-        </div>
-        <div className="border-t pt-2 flex justify-between text-sm font-bold">
-          <span>合計</span>
-          <span>¥{fixedTotal.toLocaleString()}</span>
-        </div>
-        <div className="flex justify-between text-sm text-emerald-700">
-          <span>俊樹負担（÷2）</span>
-          <span className="font-bold">¥{Math.floor(fixedTotal / 2).toLocaleString()}</span>
-        </div>
-        <p className="text-[10px] text-gray-400">変更はワリカンアプリで行ってください</p>
-      </div>
-
-      {/* Utility Bills (Read-only) */}
-      <div className="bg-white rounded-2xl p-4 shadow-sm space-y-3">
-        <div className="flex items-center justify-between">
-          <h2 className="text-sm font-bold text-gray-700">光熱費</h2>
-          <span className="text-[10px] text-emerald-500 bg-emerald-50 px-2 py-0.5 rounded-full">ワリカンから取得（先月分）</span>
-        </div>
-        {utilities.length === 0 ? (
-          <p className="text-sm text-gray-400">先月分のデータなし</p>
-        ) : (
-          <>
-            <div className="space-y-1">
-              {utilities.map((u, i) => (
-                <div key={i} className="flex justify-between text-sm">
-                  <span className="text-gray-600">{TYPE_LABELS[u.type] || u.type}</span>
-                  <span className="text-gray-700">¥{u.amount.toLocaleString()}</span>
-                </div>
-              ))}
-            </div>
-            <div className="border-t pt-2 flex justify-between text-sm text-emerald-700">
-              <span>俊樹負担（÷2）</span>
-              <span className="font-bold">¥{Math.floor(utilityTotal / 2).toLocaleString()}</span>
-            </div>
-          </>
         )}
       </div>
 

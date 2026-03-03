@@ -4,6 +4,8 @@ import { useEffect, useState, useRef } from "react";
 import { supabase } from "@/lib/supabase";
 import type { PersonalCategory } from "@/lib/supabase";
 
+const SYNC_CATEGORIES = ["共通買い物", "個人消費"];
+
 const PAYMENT_METHODS = [
   { key: "cash", label: "現金等", icon: "💴" },
   { key: "credit", label: "クレカ", icon: "💳" },
@@ -14,7 +16,7 @@ export default function RecordPage() {
   const [category, setCategory] = useState("");
   const [paymentMethod, setPaymentMethod] = useState(() => {
     if (typeof window !== "undefined") {
-      return localStorage.getItem("lastPaymentMethod") || "e-pay";
+      return localStorage.getItem("lastPaymentMethod") || "cash";
     }
     return "cash";
   });
@@ -36,7 +38,7 @@ export default function RecordPage() {
       .select("*")
       .eq("is_active", true)
       .order("sort_order");
-    setCategories(data || []);
+    setCategories((data || []).filter((c) => !SYNC_CATEGORIES.includes(c.name)));
   }
 
   const handleSave = async () => {
@@ -66,7 +68,7 @@ export default function RecordPage() {
   };
 
   return (
-    <div className="space-y-5 pb-4">
+    <div className="w-full max-w-full overflow-x-hidden space-y-5 pb-4">
       <h1 className="text-lg font-bold text-gray-800">支出を記録</h1>
 
       {/* Amount */}
@@ -81,8 +83,8 @@ export default function RecordPage() {
             value={amount}
             onChange={(e) => setAmount(e.target.value)}
             placeholder="0"
-            className="flex-1 text-4xl font-black text-gray-800 bg-transparent outline-none"
-            style={{ fontSize: "36px" }}
+            className="flex-1 min-w-0 text-3xl font-black text-gray-800 bg-transparent outline-none"
+            style={{ fontSize: "32px" }}
           />
         </div>
       </div>

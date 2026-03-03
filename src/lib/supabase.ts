@@ -38,6 +38,16 @@ export type PersonalCategory = {
   created_at: string;
 };
 
+export type PersonalFixedCost = {
+  id: string;
+  name: string;
+  amount: number;
+  is_active: boolean;
+  sort_order: number;
+  created_at: string;
+  updated_at: string;
+};
+
 // --- Types for warikan tables (read-only) ---
 
 export type FixedCost = {
@@ -57,6 +67,24 @@ export type UtilityBill = {
   payer: string;
 };
 
+export type Receipt = {
+  id: string;
+  date: string;
+  store_name: string;
+  payer: string;
+  receipt_total: number;
+  personal_total: number;
+  shared_total: number;
+  settled: boolean;
+};
+
+export type PersonalItem = {
+  id: string;
+  receipt_id: string;
+  name: string;
+  price_with_tax: number;
+};
+
 // --- Types for kakeibo tables (read-only) ---
 
 export type MonthlySavings = {
@@ -65,4 +93,15 @@ export type MonthlySavings = {
   month: number;
   person: string;
   amount: number;
+};
+
+// --- Warikan sync virtual expense type ---
+
+export type WarikanExpense = {
+  id: string;
+  amount: number;
+  category: string;
+  memo: string;
+  expense_date: string;
+  source: "warikan";
 };
