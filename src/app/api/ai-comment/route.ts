@@ -55,9 +55,14 @@ ${spendingSummary || "データなし"}
     });
 
     const data = await res.json();
+    if (data.error) {
+      console.error("Anthropic API error:", data.error);
+      return NextResponse.json({ comment: `APIエラー: ${data.error.message || JSON.stringify(data.error)}` });
+    }
     const comment = data.content?.[0]?.text || "分析できませんでした。";
     return NextResponse.json({ comment });
-  } catch {
-    return NextResponse.json({ comment: "エラーが発生しました。" }, { status: 500 });
+  } catch (e) {
+    console.error("ai-comment error:", e);
+    return NextResponse.json({ comment: `エラーが発生しました: ${e instanceof Error ? e.message : String(e)}` }, { status: 500 });
   }
 }
