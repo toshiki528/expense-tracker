@@ -280,38 +280,63 @@ export default function AnalysisPage() {
 
         {filteredExpenses.length === 0 ? (
           <p className="text-sm text-gray-400 text-center py-4">該当する支出なし</p>
-        ) : (
-          <div className="space-y-1.5">
-            {filteredExpenses.map((exp) => {
-              const cat = categories.find((c) => c.name === exp.category);
-              const isWarikan = exp.source === "warikan";
-              const inner = (
-                <div className="flex items-center justify-between py-2 border-b border-gray-50 last:border-0">
-                  <div className="flex items-center gap-2">
-                    <span className="text-lg">{cat?.icon || "📦"}</span>
+        ) : (() => {
+          const grouped: Record<string, AnyExpense[]> = {};
+          for (const exp of filteredExpenses) {
+            if (!grouped[exp.expense_date]) grouped[exp.expense_date] = [];
+            grouped[exp.expense_date].push(exp);
+          }
+          const sortedDates = Object.keys(grouped).sort((a, b) => b.localeCompare(a));
+          const DAYS = ["日", "月", "火", "水", "木", "金", "土"];
+
+          return (
+            <div className="space-y-3">
+              {sortedDates.map((dateStr) => {
+                const d = new Date(dateStr + "T00:00:00");
+                const dateLabel = `${d.getMonth() + 1}月${d.getDate()}日（${DAYS[d.getDay()]}）`;
+                const dayTotal = grouped[dateStr].reduce((s, e) => s + e.amount, 0);
+
+                return (
+                  <div key={dateStr}>
+                    <div className="flex justify-between items-center bg-gray-50 rounded-lg px-3 py-1.5 mb-1">
+                      <span className="text-xs font-bold text-gray-600">{dateLabel}</span>
+                      <span className="text-xs font-bold text-gray-700">合計: -¥{dayTotal.toLocaleString()}</span>
+                    </div>
                     <div>
-                      <p className="text-sm text-gray-700">{exp.memo || exp.category}</p>
-                      <p className="text-xs text-gray-400">
-                        {exp.expense_date}
-                        {isWarikan ? (
-                          <span className="ml-1 text-emerald-500">ワリカンから同期</span>
+                      {grouped[dateStr].map((exp) => {
+                        const cat = categories.find((c) => c.name === exp.category);
+                        const isWarikan = exp.source === "warikan";
+                        const inner = (
+                          <div className="flex items-center justify-between py-1.5 px-1 border-b border-gray-50 last:border-0">
+                            <div className="flex items-center gap-2">
+                              <span className="text-lg">{cat?.icon || "📦"}</span>
+                              <div>
+                                <p className="text-sm text-gray-700">{exp.memo || exp.category}</p>
+                                <p className="text-xs text-gray-400">
+                                  {isWarikan ? (
+                                    <span className="text-emerald-500">ワリカンから同期</span>
+                                  ) : (
+                                    "payment_method" in exp && <span>{PAYMENT_LABELS[(exp as PersonalExpense).payment_method] || (exp as PersonalExpense).payment_method}</span>
+                                  )}
+                                </p>
+                              </div>
+                            </div>
+                            <span className="text-sm font-bold text-gray-700">-¥{exp.amount.toLocaleString()}</span>
+                          </div>
+                        );
+                        return isWarikan ? (
+                          <div key={exp.id}>{inner}</div>
                         ) : (
-                          "payment_method" in exp && <span className="ml-1">{PAYMENT_LABELS[(exp as PersonalExpense).payment_method] || (exp as PersonalExpense).payment_method}</span>
-                        )}
-                      </p>
+                          <Link key={exp.id} href={`/record/${exp.id}`}>{inner}</Link>
+                        );
+                      })}
                     </div>
                   </div>
-                  <span className="text-sm font-bold text-gray-700">-¥{exp.amount.toLocaleString()}</span>
-                </div>
-              );
-              return isWarikan ? (
-                <div key={exp.id}>{inner}</div>
-              ) : (
-                <Link key={exp.id} href={`/record/${exp.id}`}>{inner}</Link>
-              );
-            })}
-          </div>
-        )}
+                );
+              })}
+            </div>
+          );
+        })()}
       </div>
     </div>
   );
