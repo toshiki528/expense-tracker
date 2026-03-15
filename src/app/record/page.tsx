@@ -25,76 +25,115 @@ export default function RecordPage() {
   const [saving, setSaving] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
 
-  // Calculator state - refs for internal state to avoid stale closures
+  // Calculator state
   const [display, setDisplay] = useState("0");
-  const [activeOp, setActiveOp] = useState<string | null>(null);
+  const [expression, setExpression] = useState<string | null>(null);
   const pendingRef = useRef<number | null>(null);
   const opRef = useRef<string | null>(null);
-  const freshRef = useRef(false); // true after = or op, next digit resets display
+  const freshRef = useRef(false);
 
   const amount = display === "0" ? "" : display;
 
+  // Blur any focused element to prevent OS keyboard
+  const blurActive = () => {
+    if (document.activeElement instanceof HTMLElement) {
+      document.activeElement.blur();
+    }
+  };
+
   const resetCalc = () => {
     setDisplay("0");
-    setActiveOp(null);
+    setExpression(null);
     pendingRef.current = null;
     opRef.current = null;
     freshRef.current = false;
   };
 
   const calcPress = (key: string) => {
+    blurActive();
+
     if (key === "C") {
       resetCalc();
       return;
     }
-    if (key === "←") {
+
+    if (key === "back") {
+      if (freshRef.current) return; // don't delete after = or op
       setDisplay((d) => (d.length <= 1 ? "0" : d.slice(0, -1)));
-      freshRef.current = false;
       return;
     }
-    if (key === "+" || key === "−") {
-      setDisplay((d) => {
-        const current = parseInt(d) || 0;
-        if (pendingRef.current !== null && opRef.current && !freshRef.current) {
-          const result = opRef.current === "+" ? pendingRef.current + current : pendingRef.current - current;
-          pendingRef.current = result;
-          opRef.current = key;
-          freshRef.current = true;
-          setActiveOp(key);
-          return String(result);
-        }
+
+    if (key === "+" || key === "-") {
+      const current = parseInt(display) || 0;
+
+      if (pendingRef.current !== null && opRef.current && !freshRef.current) {
+        // Chain: compute previous, then set new op
+        const result =
+          opRef.current === "+"
+            ? pendingRef.current + current
+            : pendingRef.current - current;
+        pendingRef.current = result;
+        opRef.current = key;
+        freshRef.current = true;
+        const opSymbol = key === "+" ? "+" : "−";
+        setExpression(`${result.toLocaleString()} ${opSymbol}`);
+        setDisplay(String(result));
+      } else {
         pendingRef.current = current;
         opRef.current = key;
         freshRef.current = true;
-        setActiveOp(key);
-        return d;
-      });
+        const opSymbol = key === "+" ? "+" : "−";
+        setExpression(`${current.toLocaleString()} ${opSymbol}`);
+      }
       return;
     }
+
     if (key === "=") {
-      setDisplay((d) => {
-        if (pendingRef.current !== null && opRef.current) {
-          const current = parseInt(d) || 0;
-          const result = opRef.current === "+" ? pendingRef.current + current : pendingRef.current - current;
-          pendingRef.current = null;
-          opRef.current = null;
-          freshRef.current = true;
-          setActiveOp(null);
-          return String(Math.max(0, result));
-        }
-        return d;
-      });
+      if (pendingRef.current !== null && opRef.current) {
+        const current = parseInt(display) || 0;
+        const result =
+          opRef.current === "+"
+            ? pendingRef.current + current
+            : pendingRef.current - current;
+        const safeResult = Math.max(0, result);
+        pendingRef.current = null;
+        opRef.current = null;
+        freshRef.current = true;
+        setExpression(null);
+        setDisplay(String(safeResult));
+      }
       return;
     }
-    // Number keys (0-9, 00)
+
+    // Number keys: 0-9, 00
     if (freshRef.current) {
       freshRef.current = false;
+      // Update expression to show the new number being typed
+      if (pendingRef.current !== null && opRef.current) {
+        const opSymbol = opRef.current === "+" ? "+" : "−";
+        const newDigit = key === "00" ? "0" : key;
+        setExpression(`${pendingRef.current.toLocaleString()} ${opSymbol} ${newDigit}`);
+      }
       setDisplay(key === "00" ? "0" : key);
     } else {
       setDisplay((d) => {
-        if (d === "0") return key === "00" ? "0" : key;
+        if (d === "0") {
+          const newVal = key === "00" ? "0" : key;
+          if (pendingRef.current !== null && opRef.current) {
+            const opSymbol = opRef.current === "+" ? "+" : "−";
+            setExpression(`${pendingRef.current.toLocaleString()} ${opSymbol} ${newVal}`);
+          }
+          return newVal;
+        }
         if (d.length >= 8) return d;
-        return d + key;
+        const newVal = d + key;
+        if (pendingRef.current !== null && opRef.current) {
+          const opSymbol = opRef.current === "+" ? "+" : "−";
+          setExpression(
+            `${pendingRef.current.toLocaleString()} ${opSymbol} ${parseInt(newVal).toLocaleString()}`
+          );
+        }
+        return newVal;
       });
     }
   };
@@ -113,6 +152,7 @@ export default function RecordPage() {
   }
 
   const handleSave = async () => {
+    blurActive();
     const amountNum = parseInt(amount);
     if (!amountNum || !category) return;
 
@@ -137,55 +177,57 @@ export default function RecordPage() {
     setSaving(false);
   };
 
-  return (
-    <div className="w-full max-w-full overflow-x-hidden space-y-5 pb-4">
-      <h1 className="text-lg font-bold text-gray-800">支出を記録</h1>
+  const CAL_KEYS = [
+    { k: "7", label: "7", s: "num" },
+    { k: "8", label: "8", s: "num" },
+    { k: "9", label: "9", s: "num" },
+    { k: "back", label: "⌫", s: "fn" },
+    { k: "4", label: "4", s: "num" },
+    { k: "5", label: "5", s: "num" },
+    { k: "6", label: "6", s: "num" },
+    { k: "+", label: "+", s: "op" },
+    { k: "1", label: "1", s: "num" },
+    { k: "2", label: "2", s: "num" },
+    { k: "3", label: "3", s: "num" },
+    { k: "-", label: "−", s: "op" },
+    { k: "C", label: "C", s: "clear" },
+    { k: "0", label: "0", s: "num" },
+    { k: "00", label: "00", s: "num" },
+    { k: "=", label: "=", s: "eq" },
+  ];
 
-      {/* Amount + Calculator */}
-      <div className="bg-white rounded-2xl p-4 shadow-sm">
-        <label className="text-xs text-gray-500 block mb-2">金額</label>
-        <div className="flex items-center gap-2 mb-1">
-          <span className="text-2xl text-gray-400">¥</span>
-          <span className="flex-1 min-w-0 text-3xl font-black text-gray-800" style={{ fontSize: "32px" }}>
-            {display === "0" ? <span className="text-gray-300">0</span> : parseInt(display).toLocaleString()}
+  return (
+    <div className="w-full max-w-full overflow-x-hidden flex flex-col pb-4">
+      {/* Amount display */}
+      <div className="bg-white rounded-2xl p-4 shadow-sm mb-4">
+        <label className="text-xs text-gray-500 block mb-1">金額</label>
+        {expression && (
+          <p className="text-xs text-gray-400 text-right mb-0.5">{expression}</p>
+        )}
+        <div className="flex items-baseline gap-2 justify-end">
+          <span className="text-xl text-gray-400">¥</span>
+          <span
+            className="text-4xl font-black text-gray-800 tabular-nums"
+            style={{ fontSize: "36px", lineHeight: 1.2 }}
+          >
+            {display === "0" ? (
+              <span className="text-gray-300">0</span>
+            ) : (
+              parseInt(display).toLocaleString()
+            )}
           </span>
-          {activeOp && (
-            <span className="text-lg font-bold text-emerald-600">{activeOp === "+" ? "+" : "−"}</span>
-          )}
-        </div>
-        {/* Calculator keypad */}
-        <div className="grid grid-cols-4 gap-2 mt-3">
-          {[
-            { k: "7", style: "num" }, { k: "8", style: "num" }, { k: "9", style: "num" }, { k: "←", style: "fn" },
-            { k: "4", style: "num" }, { k: "5", style: "num" }, { k: "6", style: "num" }, { k: "C", style: "fn" },
-            { k: "1", style: "num" }, { k: "2", style: "num" }, { k: "3", style: "num" }, { k: "−", style: "op" },
-            { k: "0", style: "num" }, { k: "00", style: "num" }, { k: "=", style: "eq" }, { k: "+", style: "op" },
-          ].map(({ k, style }) => (
-            <button
-              key={k}
-              type="button"
-              onClick={() => calcPress(k)}
-              className={`py-3 rounded-xl text-base font-bold active:scale-95 transition ${
-                style === "num" ? "bg-gray-100 text-gray-800" :
-                style === "fn" ? "bg-gray-200 text-gray-600" :
-                style === "op" ? "bg-emerald-100 text-emerald-700" :
-                "bg-emerald-600 text-white"
-              }`}
-            >
-              {k}
-            </button>
-          ))}
         </div>
       </div>
 
       {/* Category */}
-      <div className="bg-white rounded-2xl p-4 shadow-sm">
+      <div className="bg-white rounded-2xl p-4 shadow-sm mb-4">
         <label className="text-xs text-gray-500 block mb-3">カテゴリ</label>
         <div className="grid grid-cols-3 gap-2">
           {categories.map((cat) => (
             <button
               key={cat.id}
-              onClick={() => setCategory(cat.name)}
+              type="button"
+              onClick={() => { blurActive(); setCategory(cat.name); }}
               className={`py-3 rounded-xl text-sm font-bold transition ${
                 category === cat.name
                   ? "bg-emerald-600 text-white shadow-md"
@@ -200,13 +242,14 @@ export default function RecordPage() {
       </div>
 
       {/* Payment Method */}
-      <div className="bg-white rounded-2xl p-4 shadow-sm">
+      <div className="bg-white rounded-2xl p-4 shadow-sm mb-4">
         <label className="text-xs text-gray-500 block mb-3">支払い方法</label>
         <div className="grid grid-cols-2 gap-2">
           {PAYMENT_METHODS.map((pm) => (
             <button
               key={pm.key}
-              onClick={() => setPaymentMethod(pm.key)}
+              type="button"
+              onClick={() => { blurActive(); setPaymentMethod(pm.key); }}
               className={`py-3 rounded-xl text-sm font-bold transition ${
                 paymentMethod === pm.key
                   ? "bg-emerald-600 text-white"
@@ -221,7 +264,7 @@ export default function RecordPage() {
       </div>
 
       {/* Date & Memo */}
-      <div className="bg-white rounded-2xl p-4 shadow-sm space-y-3">
+      <div className="bg-white rounded-2xl p-4 shadow-sm mb-4 space-y-3">
         <div>
           <label className="text-xs text-gray-500 block mb-1">日付</label>
           <input
@@ -245,8 +288,36 @@ export default function RecordPage() {
         </div>
       </div>
 
+      {/* Calculator keypad - fixed bottom area */}
+      <div className="bg-white rounded-2xl p-3 shadow-sm mb-3">
+        <div className="grid grid-cols-4 gap-2">
+          {CAL_KEYS.map(({ k, label, s }) => (
+            <button
+              key={k}
+              type="button"
+              onClick={() => calcPress(k)}
+              className={`rounded-xl text-lg font-bold active:scale-95 transition select-none ${
+                s === "num"
+                  ? "bg-gray-100 text-gray-800"
+                  : s === "fn"
+                    ? "bg-gray-200 text-gray-600"
+                    : s === "op"
+                      ? "bg-emerald-100 text-emerald-700"
+                      : s === "clear"
+                        ? "bg-red-100 text-red-600"
+                        : "bg-emerald-600 text-white"
+              }`}
+              style={{ minHeight: "52px" }}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
+      </div>
+
       {/* Save Button */}
       <button
+        type="button"
         onClick={handleSave}
         disabled={saving || !amount || !category}
         className="w-full py-4 rounded-2xl text-lg font-black bg-emerald-600 text-white disabled:opacity-40 shadow-lg active:scale-95 transition"
