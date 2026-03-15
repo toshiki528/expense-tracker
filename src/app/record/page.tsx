@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useRef } from "react";
 import { supabase } from "@/lib/supabase";
 import type { PersonalCategory } from "@/lib/supabase";
 
@@ -25,62 +25,79 @@ export default function RecordPage() {
   const [saving, setSaving] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
 
-  // Calculator state
+  // Calculator state - refs for internal state to avoid stale closures
   const [display, setDisplay] = useState("0");
-  const [pendingValue, setPendingValue] = useState<number | null>(null);
-  const [operator, setOperator] = useState<string | null>(null);
-  const [justCalculated, setJustCalculated] = useState(false);
+  const [activeOp, setActiveOp] = useState<string | null>(null);
+  const pendingRef = useRef<number | null>(null);
+  const opRef = useRef<string | null>(null);
+  const freshRef = useRef(false); // true after = or op, next digit resets display
 
   const amount = display === "0" ? "" : display;
 
-  const calcPress = useCallback((key: string) => {
+  const resetCalc = () => {
+    setDisplay("0");
+    setActiveOp(null);
+    pendingRef.current = null;
+    opRef.current = null;
+    freshRef.current = false;
+  };
+
+  const calcPress = (key: string) => {
     if (key === "C") {
-      setDisplay("0");
-      setPendingValue(null);
-      setOperator(null);
-      setJustCalculated(false);
+      resetCalc();
       return;
     }
     if (key === "←") {
       setDisplay((d) => (d.length <= 1 ? "0" : d.slice(0, -1)));
-      setJustCalculated(false);
+      freshRef.current = false;
       return;
     }
     if (key === "+" || key === "−") {
-      const current = parseInt(display) || 0;
-      if (pendingValue !== null && operator) {
-        const result = operator === "+" ? pendingValue + current : pendingValue - current;
-        setPendingValue(result);
-        setDisplay(String(result));
-      } else {
-        setPendingValue(current);
-      }
-      setOperator(key);
-      setJustCalculated(true);
+      setDisplay((d) => {
+        const current = parseInt(d) || 0;
+        if (pendingRef.current !== null && opRef.current && !freshRef.current) {
+          const result = opRef.current === "+" ? pendingRef.current + current : pendingRef.current - current;
+          pendingRef.current = result;
+          opRef.current = key;
+          freshRef.current = true;
+          setActiveOp(key);
+          return String(result);
+        }
+        pendingRef.current = current;
+        opRef.current = key;
+        freshRef.current = true;
+        setActiveOp(key);
+        return d;
+      });
       return;
     }
     if (key === "=") {
-      if (pendingValue !== null && operator) {
-        const current = parseInt(display) || 0;
-        const result = operator === "+" ? pendingValue + current : pendingValue - current;
-        setDisplay(String(Math.max(0, result)));
-        setPendingValue(null);
-        setOperator(null);
-        setJustCalculated(true);
-      }
+      setDisplay((d) => {
+        if (pendingRef.current !== null && opRef.current) {
+          const current = parseInt(d) || 0;
+          const result = opRef.current === "+" ? pendingRef.current + current : pendingRef.current - current;
+          pendingRef.current = null;
+          opRef.current = null;
+          freshRef.current = true;
+          setActiveOp(null);
+          return String(Math.max(0, result));
+        }
+        return d;
+      });
       return;
     }
     // Number keys (0-9, 00)
-    setDisplay((d) => {
-      if (justCalculated) {
-        setJustCalculated(false);
-        return key === "00" ? "0" : key;
-      }
-      if (d === "0") return key === "00" ? "0" : key;
-      if (d.length >= 8) return d;
-      return d + key;
-    });
-  }, [display, pendingValue, operator, justCalculated]);
+    if (freshRef.current) {
+      freshRef.current = false;
+      setDisplay(key === "00" ? "0" : key);
+    } else {
+      setDisplay((d) => {
+        if (d === "0") return key === "00" ? "0" : key;
+        if (d.length >= 8) return d;
+        return d + key;
+      });
+    }
+  };
 
   useEffect(() => {
     loadCategories();
@@ -111,10 +128,7 @@ export default function RecordPage() {
     if (!error) {
       localStorage.setItem("lastPaymentMethod", paymentMethod);
       setToast(`✓ ¥${amountNum.toLocaleString()} 記録しました`);
-      setDisplay("0");
-      setPendingValue(null);
-      setOperator(null);
-      setJustCalculated(false);
+      resetCalc();
       setCategory("");
       setMemo("");
       setDate(new Date().toISOString().split("T")[0]);
@@ -135,8 +149,8 @@ export default function RecordPage() {
           <span className="flex-1 min-w-0 text-3xl font-black text-gray-800" style={{ fontSize: "32px" }}>
             {display === "0" ? <span className="text-gray-300">0</span> : parseInt(display).toLocaleString()}
           </span>
-          {operator && (
-            <span className="text-lg font-bold text-emerald-600">{operator === "+" ? "+" : "−"}</span>
+          {activeOp && (
+            <span className="text-lg font-bold text-emerald-600">{activeOp === "+" ? "+" : "−"}</span>
           )}
         </div>
         {/* Calculator keypad */}
