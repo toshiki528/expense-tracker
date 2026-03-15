@@ -1,6 +1,33 @@
+@import url('https://fonts.googleapis.com/css2?family=Zen+Kaku+Gothic+New:wght@300;400;500;700&family=JetBrains+Mono:wght@400;500;600;700;800&display=swap');
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+:root {
+  --bg: #FAFAF7;
+  --bg-card: #FFFFFF;
+  --ink: #1A1A1A;
+  --ink-light: #3D3D3D;
+  --accent: #2D8A7E;
+  --accent-light: #EBF5F3;
+  --accent-muted: #A3CFC8;
+  --accent-dark: #236B62;
+  --warm-gray-50: #F7F7F4;
+  --warm-gray-100: #EDEDEA;
+  --warm-gray-200: #DDDDD8;
+  --warm-gray-300: #C4C4BE;
+  --warm-gray-400: #9B9B94;
+  --warm-gray-500: #75756F;
+  --warm-gray-600: #5C5C56;
+  --border: #E8E8E4;
+  --border-strong: #D4D4CE;
+  --error: #C4463A;
+  --error-light: #FDF2F1;
+  --cream: #FBF8F1;
+  --cream-accent: #E8D5B7;
+  --warning: #C9913A;
+}
 
 *, *::before, *::after {
   box-sizing: border-box;
@@ -10,6 +37,24 @@ html, body {
   overflow-x: hidden;
   width: 100%;
   max-width: 100vw;
+  font-family: 'Zen Kaku Gothic New', sans-serif;
+  color: var(--ink);
+  background-color: var(--bg);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+@layer components {
+  .card {
+    @apply bg-white rounded-lg;
+    border: 1px solid var(--border);
+    box-shadow: 0 1px 3px rgba(26, 26, 26, 0.03);
+  }
+
+  .font-amount {
+    font-family: 'JetBrains Mono', monospace;
+    font-variant-numeric: tabular-nums;
+  }
 }
 
 input[type="number"]::-webkit-inner-spin-button,
@@ -19,4 +64,18 @@ input[type="number"]::-webkit-outer-spin-button {
 }
 input[type="number"] {
   -moz-appearance: textfield;
+}
+
+@keyframes slideDown {
+  from {
+    transform: translate(-50%, -120%);
+    opacity: 0;
+  }
+  to {
+    transform: translate(-50%, 0);
+    opacity: 1;
+  }
+}
+.toast-slide-in {
+  animation: slideDown 0.3s cubic-bezier(0.22, 0.61, 0.36, 1) forwards;
 }

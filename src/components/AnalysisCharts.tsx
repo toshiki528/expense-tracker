@@ -2,7 +2,7 @@
 
 import { PieChart, Pie, Cell, ResponsiveContainer, LineChart, Line, XAxis, YAxis, Tooltip } from "recharts";
 
-const COLORS = ["#059669", "#0ea5e9", "#f59e0b", "#ef4444", "#8b5cf6", "#ec4899", "#14b8a6"];
+const COLORS = ["#2D8A7E", "#C4956A", "#8B9E8B", "#D4A574", "#6BB3A9", "#A0877B", "#4A9E93"];
 
 type CatBreakdown = { name: string; icon: string; spent: number; prevSpent: number; budget: number | null };
 
@@ -21,10 +21,9 @@ export default function AnalysisCharts({
 
   return (
     <>
-      {/* Pie Chart */}
       {pieData.length > 0 && (
-        <div className="bg-white rounded-2xl p-4 shadow-sm">
-          <h2 className="text-xs font-bold text-gray-500 mb-2">カテゴリ別</h2>
+        <div className="card p-5">
+          <h2 className="text-xs font-light tracking-wide mb-3" style={{ color: "var(--warm-gray-500)" }}>カテゴリ別</h2>
           <div className="flex items-center">
             <div className="w-36 h-36">
               <ResponsiveContainer width="100%" height="100%">
@@ -45,39 +44,41 @@ export default function AnalysisCharts({
                 </PieChart>
               </ResponsiveContainer>
             </div>
-            <div className="flex-1 space-y-1 ml-2">
+            <div className="flex-1 space-y-1.5 ml-3">
               {pieData.map((d, i) => {
                 const pct = totalSpent > 0 ? Math.round((d.value / totalSpent) * 100) : 0;
                 return (
                   <div key={d.name} className="flex items-center justify-between text-xs">
-                    <div className="flex items-center gap-1">
-                      <span className="w-2.5 h-2.5 rounded-full inline-block" style={{ backgroundColor: COLORS[i % COLORS.length] }} />
-                      <span className="text-gray-600">{d.name}</span>
+                    <div className="flex items-center gap-1.5">
+                      <span className="w-2 h-2 rounded-full inline-block" style={{ backgroundColor: COLORS[i % COLORS.length] }} />
+                      <span style={{ color: "var(--warm-gray-600)" }}>{d.name}</span>
                     </div>
-                    <span className="font-bold text-gray-700">{pct}%</span>
+                    <span className="font-amount font-semibold" style={{ color: "var(--ink)" }}>{pct}%</span>
                   </div>
                 );
               })}
             </div>
           </div>
-          <p className="text-center text-xs text-gray-400 mt-1">合計: ¥{totalSpent.toLocaleString()}</p>
+          <p className="text-center text-xs mt-2 font-amount" style={{ color: "var(--warm-gray-400)" }}>
+            合計: ¥{totalSpent.toLocaleString()}
+          </p>
         </div>
       )}
 
-      {/* Monthly Trend */}
       {monthlyTrend.some((m) => m.total > 0) && (
-        <div className="bg-white rounded-2xl p-4 shadow-sm">
-          <h2 className="text-xs font-bold text-gray-500 mb-2">月間推移（6ヶ月）</h2>
+        <div className="card p-5">
+          <h2 className="text-xs font-light tracking-wide mb-3" style={{ color: "var(--warm-gray-500)" }}>月間推移（6ヶ月）</h2>
           <div className="h-40">
             <ResponsiveContainer width="100%" height="100%">
               <LineChart data={monthlyTrend}>
-                <XAxis dataKey="month" tick={{ fontSize: 10 }} />
-                <YAxis tick={{ fontSize: 10 }} tickFormatter={(v) => `${Math.round(v / 1000)}k`} width={35} />
+                <XAxis dataKey="month" tick={{ fontSize: 10, fill: "var(--warm-gray-400)" }} axisLine={{ stroke: "var(--border)" }} tickLine={false} />
+                <YAxis tick={{ fontSize: 10, fill: "var(--warm-gray-400)" }} tickFormatter={(v) => `${Math.round(v / 1000)}k`} width={35} axisLine={false} tickLine={false} />
                 <Tooltip
                   formatter={(value) => [`¥${Number(value).toLocaleString()}`, "消費"]}
                   labelFormatter={(l) => String(l)}
+                  contentStyle={{ borderRadius: "8px", border: "1px solid var(--border)", boxShadow: "0 2px 8px rgba(0,0,0,0.06)", fontSize: "12px" }}
                 />
-                <Line type="monotone" dataKey="total" stroke="#059669" strokeWidth={2} dot={{ r: 4 }} />
+                <Line type="monotone" dataKey="total" stroke="var(--accent)" strokeWidth={2} dot={{ r: 3, fill: "var(--accent)" }} />
               </LineChart>
             </ResponsiveContainer>
           </div>

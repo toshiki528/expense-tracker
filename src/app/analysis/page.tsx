@@ -220,18 +220,18 @@ export default function AnalysisPage() {
   if (loading) {
     return (
       <div className="flex items-center justify-center h-64">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-emerald-600" />
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2" style={{ borderColor: "var(--accent)" }} />
       </div>
     );
   }
 
   return (
-    <div className="space-y-4 pb-4">
+    <div className="space-y-6 pb-4">
       {/* Period Selector */}
-      <div className="flex items-center justify-between">
-        <button onClick={() => navigate(-1)} className="text-2xl text-gray-400 px-2">‹</button>
-        <h1 className="text-base font-bold text-gray-800">{period.label}</h1>
-        <button onClick={() => navigate(1)} className="text-2xl text-gray-400 px-2">›</button>
+      <div className="flex items-center justify-between px-2">
+        <button onClick={() => navigate(-1)} className="text-xl px-3 py-1" style={{ color: "var(--warm-gray-400)" }}>‹</button>
+        <h1 className="text-sm font-medium tracking-wide" style={{ color: "var(--ink)" }}>{period.label}</h1>
+        <button onClick={() => navigate(1)} className="text-xl px-3 py-1" style={{ color: "var(--warm-gray-400)" }}>›</button>
       </div>
 
       <Charts
@@ -241,60 +241,67 @@ export default function AnalysisPage() {
       />
 
       {/* マネ吉 AI Comment */}
-      <div className="bg-amber-50 rounded-2xl p-4 shadow-sm">
-        <div className="flex items-center gap-2 mb-3">
-          <span className="text-2xl">🐥</span>
-          <div>
-            <h2 className="text-sm font-bold text-amber-800">マネ吉のひとこと</h2>
-            <p className="text-[10px] text-amber-600">AIファイナンシャルパートナー</p>
+      <div className="rounded-lg overflow-hidden" style={{ backgroundColor: "var(--cream)", border: "1px solid var(--cream-accent)" }}>
+        <div className="flex">
+          <div className="w-1 shrink-0" style={{ backgroundColor: "var(--accent)" }} />
+          <div className="flex-1 p-5">
+            <div className="flex items-center gap-2 mb-3">
+              <span className="text-2xl">🐥</span>
+              <div>
+                <h2 className="text-sm font-medium" style={{ color: "var(--ink)" }}>マネ吉のひとこと</h2>
+                <p className="text-[10px] font-light" style={{ color: "var(--warm-gray-500)" }}>AIファイナンシャルパートナー</p>
+              </div>
+            </div>
+            {aiComment ? (
+              <>
+                <div className="rounded p-3 text-sm leading-relaxed whitespace-pre-wrap" style={{ backgroundColor: "var(--bg-card)", color: "var(--ink-light)" }}>
+                  {aiComment}
+                </div>
+                <button
+                  onClick={fetchAiComment}
+                  disabled={aiLoading}
+                  className="mt-3 w-full py-2 rounded text-xs font-light transition-colors"
+                  style={{ backgroundColor: "var(--cream-accent)", color: "var(--ink-light)" }}
+                >
+                  {aiLoading ? "分析中..." : "もう一度聞く"}
+                </button>
+              </>
+            ) : (
+              <button
+                onClick={fetchAiComment}
+                disabled={aiLoading}
+                className="w-full py-3 rounded text-sm font-medium transition-all disabled:opacity-50"
+                style={{ backgroundColor: "var(--cream-accent)", color: "var(--ink-light)" }}
+              >
+                {aiLoading ? (
+                  <span className="flex items-center justify-center gap-2">
+                    <span className="animate-spin rounded-full h-4 w-4 border-b-2" style={{ borderColor: "var(--ink-light)" }} />
+                    分析中...
+                  </span>
+                ) : (
+                  "🐥 マネ吉に聞いてみる"
+                )}
+              </button>
+            )}
           </div>
         </div>
-        {aiComment ? (
-          <>
-            <div className="bg-white rounded-xl p-3 text-sm text-gray-700 leading-relaxed whitespace-pre-wrap">
-              {aiComment}
-            </div>
-            <button
-              onClick={fetchAiComment}
-              disabled={aiLoading}
-              className="mt-2 w-full py-2 rounded-lg text-xs text-amber-700 bg-amber-100 active:bg-amber-200"
-            >
-              {aiLoading ? "分析中..." : "もう一度聞く"}
-            </button>
-          </>
-        ) : (
-          <button
-            onClick={fetchAiComment}
-            disabled={aiLoading}
-            className="w-full py-3 rounded-xl text-sm font-bold bg-amber-100 text-amber-800 active:bg-amber-200 transition disabled:opacity-50"
-          >
-            {aiLoading ? (
-              <span className="flex items-center justify-center gap-2">
-                <span className="animate-spin rounded-full h-4 w-4 border-b-2 border-amber-800" />
-                分析中...
-              </span>
-            ) : (
-              "🐥 マネ吉に聞いてみる"
-            )}
-          </button>
-        )}
       </div>
 
       {/* Month Comparison */}
-      <div className="bg-white rounded-2xl p-4 shadow-sm">
-        <h2 className="text-xs font-bold text-gray-500 mb-3">前月比較</h2>
+      <div className="card p-5">
+        <h2 className="text-xs font-light tracking-widest mb-4" style={{ color: "var(--warm-gray-400)" }}>前月比較</h2>
         {catBreakdown.length === 0 ? (
-          <p className="text-sm text-gray-400 text-center py-2">データなし</p>
+          <p className="text-sm text-center py-3" style={{ color: "var(--warm-gray-300)" }}>データなし</p>
         ) : (
-          <div className="space-y-3">
+          <div className="space-y-5">
             {catBreakdown.map((cat) => {
               const diff = cat.spent - cat.prevSpent;
               return (
                 <div key={cat.name}>
-                  <div className="text-sm text-gray-700 mb-0.5">{cat.icon} {cat.name}</div>
-                  <div className="text-lg font-bold text-gray-800">¥{cat.spent.toLocaleString()}</div>
-                  <div className="text-xs text-gray-400">
-                    <span className={diff > 0 ? "text-red-400" : diff < 0 ? "text-emerald-400" : ""}>
+                  <div className="text-sm mb-1" style={{ color: "var(--warm-gray-600)" }}>{cat.icon} {cat.name}</div>
+                  <div className="font-amount text-xl font-bold" style={{ color: "var(--ink)" }}>¥{cat.spent.toLocaleString()}</div>
+                  <div className="text-xs mt-0.5" style={{ color: "var(--warm-gray-400)" }}>
+                    <span style={{ color: diff > 0 ? "var(--error)" : diff < 0 ? "var(--accent)" : "var(--warm-gray-400)" }}>
                       先月比 {diff > 0 ? `+¥${diff.toLocaleString()}` : diff < 0 ? `¥${diff.toLocaleString()}` : "±0"}
                     </span>
                     {" / 先月: ¥"}{cat.prevSpent.toLocaleString()}
@@ -307,14 +314,19 @@ export default function AnalysisPage() {
       </div>
 
       {/* Expense List */}
-      <div className="bg-white rounded-2xl p-4 shadow-sm">
-        <h2 className="text-xs font-bold text-gray-500 mb-3">支出一覧</h2>
+      <div className="card p-5">
+        <h2 className="text-xs font-light tracking-widest mb-4" style={{ color: "var(--warm-gray-400)" }}>支出一覧</h2>
 
         {/* Filters */}
-        <div className="flex gap-2 mb-3 overflow-x-auto pb-1">
+        <div className="flex gap-2 mb-4 overflow-x-auto pb-1">
           <button
             onClick={() => setFilter((f) => ({ ...f, category: "" }))}
-            className={`text-xs px-3 py-1 rounded-full whitespace-nowrap ${!filter.category ? "bg-emerald-600 text-white" : "bg-gray-100 text-gray-600"}`}
+            className="text-xs px-3 py-1.5 rounded-full whitespace-nowrap transition-colors"
+            style={{
+              backgroundColor: !filter.category ? "var(--accent)" : "var(--warm-gray-50)",
+              color: !filter.category ? "#FFFFFF" : "var(--warm-gray-600)",
+              border: !filter.category ? "none" : "1px solid var(--border)",
+            }}
           >
             全て
           </button>
@@ -322,7 +334,12 @@ export default function AnalysisPage() {
             <button
               key={cat.id}
               onClick={() => setFilter((f) => ({ ...f, category: cat.name }))}
-              className={`text-xs px-3 py-1 rounded-full whitespace-nowrap ${filter.category === cat.name ? "bg-emerald-600 text-white" : "bg-gray-100 text-gray-600"}`}
+              className="text-xs px-3 py-1.5 rounded-full whitespace-nowrap transition-colors"
+              style={{
+                backgroundColor: filter.category === cat.name ? "var(--accent)" : "var(--warm-gray-50)",
+                color: filter.category === cat.name ? "#FFFFFF" : "var(--warm-gray-600)",
+                border: filter.category === cat.name ? "none" : "1px solid var(--border)",
+              }}
             >
               {cat.icon}{cat.name}
             </button>
@@ -330,7 +347,7 @@ export default function AnalysisPage() {
         </div>
 
         {filteredExpenses.length === 0 ? (
-          <p className="text-sm text-gray-400 text-center py-4">該当する支出なし</p>
+          <p className="text-sm text-center py-6" style={{ color: "var(--warm-gray-300)" }}>該当する支出なし</p>
         ) : (() => {
           const grouped: Record<string, AnyExpense[]> = {};
           for (const exp of filteredExpenses) {
@@ -341,7 +358,7 @@ export default function AnalysisPage() {
           const DAYS = ["日", "月", "火", "水", "木", "金", "土"];
 
           return (
-            <div className="space-y-3">
+            <div className="space-y-4">
               {sortedDates.map((dateStr) => {
                 const d = new Date(dateStr + "T00:00:00");
                 const dateLabel = `${d.getMonth() + 1}月${d.getDate()}日（${DAYS[d.getDay()]}）`;
@@ -349,9 +366,9 @@ export default function AnalysisPage() {
 
                 return (
                   <div key={dateStr}>
-                    <div className="flex justify-between items-center bg-gray-50 rounded-lg px-3 py-1.5 mb-1">
-                      <span className="text-xs font-bold text-gray-600">{dateLabel}</span>
-                      <span className="text-xs font-bold text-gray-700">合計: -¥{dayTotal.toLocaleString()}</span>
+                    <div className="flex justify-between items-center rounded px-3 py-1.5 mb-1" style={{ backgroundColor: "var(--warm-gray-50)" }}>
+                      <span className="text-xs font-medium" style={{ color: "var(--warm-gray-600)" }}>{dateLabel}</span>
+                      <span className="text-xs font-amount font-semibold" style={{ color: "var(--ink-light)" }}>-¥{dayTotal.toLocaleString()}</span>
                     </div>
                     <div>
                       {grouped[dateStr].map((exp) => {
@@ -370,21 +387,21 @@ export default function AnalysisPage() {
                               }
                             }}
                           >
-                            <div className="flex items-center justify-between py-1.5 px-1 border-b border-gray-50 last:border-0 active:bg-gray-50 transition">
-                              <div className="flex items-center gap-2">
+                            <div className="flex items-center justify-between py-2.5 px-1 transition-colors">
+                              <div className="flex items-center gap-3">
                                 <span className="text-lg">{cat?.icon || "📦"}</span>
                                 <div>
-                                  <p className="text-sm text-gray-700">{exp.memo || exp.category}</p>
-                                  <p className="text-xs text-gray-400">
+                                  <p className="text-sm" style={{ color: "var(--ink-light)" }}>{exp.memo || exp.category}</p>
+                                  <p className="text-xs" style={{ color: "var(--warm-gray-400)" }}>
                                     {isWarikan ? (
-                                      <span className="text-emerald-500">ワリカンから同期</span>
+                                      <span style={{ color: "var(--accent)" }}>ワリカンから同期</span>
                                     ) : (
                                       "payment_method" in exp && <span>{PAYMENT_LABELS[(exp as PersonalExpense).payment_method] || (exp as PersonalExpense).payment_method}</span>
                                     )}
                                   </p>
                                 </div>
                               </div>
-                              <span className="text-sm font-bold text-gray-700">-¥{exp.amount.toLocaleString()}</span>
+                              <span className="font-amount text-sm font-semibold" style={{ color: "var(--ink)" }}>-¥{exp.amount.toLocaleString()}</span>
                             </div>
                           </button>
                         );
@@ -400,49 +417,51 @@ export default function AnalysisPage() {
 
       {/* Warikan toast */}
       {warikanToast && (
-        <div className="fixed top-4 left-1/2 -translate-x-1/2 bg-gray-800 text-white px-6 py-3 rounded-full text-sm font-bold shadow-xl z-50">
+        <div className="fixed top-4 left-1/2 toast-slide-in z-50 text-sm font-medium px-6 py-3 rounded-lg"
+          style={{ backgroundColor: "var(--ink)", color: "#FFFFFF", boxShadow: "0 4px 20px rgba(0,0,0,0.15)" }}>
           ワリカンアプリで変更してください
         </div>
       )}
 
       {/* Edit Modal */}
       {editingExpense && (
-        <div className="fixed inset-0 bg-black/50 flex items-end justify-center z-50" onClick={closeEditModal}>
-          <div className="bg-white rounded-t-2xl w-full max-w-lg p-5 space-y-4 max-h-[85vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
+        <div className="fixed inset-0 bg-black/40 flex items-end justify-center z-50" onClick={closeEditModal}>
+          <div className="bg-white rounded-t-lg w-full max-w-lg p-5 space-y-4 max-h-[85vh] overflow-y-auto" style={{ border: "1px solid var(--border)", borderBottom: "none" }} onClick={(e) => e.stopPropagation()}>
             <div className="flex items-center justify-between mb-1">
-              <h2 className="text-base font-bold text-gray-800">支出を編集</h2>
-              <button onClick={closeEditModal} className="text-sm text-gray-400">✕</button>
+              <h2 className="text-base font-medium" style={{ color: "var(--ink)" }}>支出を編集</h2>
+              <button onClick={closeEditModal} className="text-sm" style={{ color: "var(--warm-gray-400)" }}>✕</button>
             </div>
 
             {/* Amount */}
             <div>
-              <label className="text-xs text-gray-500 block mb-1">金額</label>
+              <label className="text-xs font-light tracking-wide block mb-1" style={{ color: "var(--warm-gray-400)" }}>金額</label>
               <div className="flex items-center gap-2">
-                <span className="text-xl text-gray-400">¥</span>
+                <span className="font-amount text-lg" style={{ color: "var(--warm-gray-300)" }}>¥</span>
                 <input
                   type="number"
                   inputMode="numeric"
                   value={editAmount}
                   onChange={(e) => setEditAmount(e.target.value)}
-                  className="flex-1 text-2xl font-black text-gray-800 bg-transparent outline-none"
-                  style={{ fontSize: "28px" }}
+                  className="flex-1 font-amount font-extrabold bg-transparent outline-none"
+                  style={{ fontSize: "28px", color: "var(--ink)" }}
                 />
               </div>
             </div>
 
             {/* Category */}
             <div>
-              <label className="text-xs text-gray-500 block mb-2">カテゴリ</label>
+              <label className="text-xs font-light tracking-wide block mb-2" style={{ color: "var(--warm-gray-400)" }}>カテゴリ</label>
               <div className="grid grid-cols-3 gap-2">
                 {categories.map((cat) => (
                   <button
                     key={cat.id}
                     onClick={() => setEditCategory(cat.name)}
-                    className={`py-2.5 rounded-xl text-xs font-bold transition ${
-                      editCategory === cat.name
-                        ? "bg-emerald-600 text-white shadow-md"
-                        : "bg-gray-50 text-gray-700"
-                    }`}
+                    className="py-2.5 rounded text-xs font-medium transition-all relative"
+                    style={{
+                      backgroundColor: editCategory === cat.name ? "var(--accent-light)" : "var(--warm-gray-50)",
+                      color: editCategory === cat.name ? "var(--accent-dark)" : "var(--warm-gray-600)",
+                      border: editCategory === cat.name ? "1px solid var(--accent-muted)" : "1px solid transparent",
+                    }}
                   >
                     <span className="text-lg block mb-0.5">{cat.icon}</span>
                     {cat.name}
@@ -453,17 +472,18 @@ export default function AnalysisPage() {
 
             {/* Payment Method */}
             <div>
-              <label className="text-xs text-gray-500 block mb-2">支払い方法</label>
+              <label className="text-xs font-light tracking-wide block mb-2" style={{ color: "var(--warm-gray-400)" }}>支払い方法</label>
               <div className="grid grid-cols-2 gap-2">
                 {EDIT_PAYMENT_METHODS.map((pm) => (
                   <button
                     key={pm.key}
                     onClick={() => setEditPayment(pm.key)}
-                    className={`py-2.5 rounded-xl text-xs font-bold transition ${
-                      editPayment === pm.key
-                        ? "bg-emerald-600 text-white"
-                        : "bg-gray-50 text-gray-600"
-                    }`}
+                    className="py-2.5 rounded text-xs font-medium transition-all"
+                    style={{
+                      backgroundColor: editPayment === pm.key ? "var(--accent-light)" : "var(--warm-gray-50)",
+                      color: editPayment === pm.key ? "var(--accent-dark)" : "var(--warm-gray-600)",
+                      border: editPayment === pm.key ? "1px solid var(--accent-muted)" : "1px solid transparent",
+                    }}
                   >
                     <span className="text-base block">{pm.icon}</span>
                     {pm.label}
@@ -475,15 +495,17 @@ export default function AnalysisPage() {
             {/* Date & Memo */}
             <div className="space-y-3">
               <div>
-                <label className="text-xs text-gray-500 block mb-1">日付</label>
+                <label className="text-xs font-light tracking-wide block mb-1" style={{ color: "var(--warm-gray-400)" }}>日付</label>
                 <input type="date" value={editDate} onChange={(e) => setEditDate(e.target.value)}
-                  className="w-full text-sm border border-gray-200 rounded-lg px-3 py-2.5" style={{ fontSize: "16px" }} />
+                  className="w-full text-sm rounded px-3 py-2.5 outline-none"
+                  style={{ fontSize: "16px", border: "1px solid var(--border)", color: "var(--ink)" }} />
               </div>
               <div>
-                <label className="text-xs text-gray-500 block mb-1">メモ</label>
+                <label className="text-xs font-light tracking-wide block mb-1" style={{ color: "var(--warm-gray-400)" }}>メモ</label>
                 <input type="text" value={editMemo} onChange={(e) => setEditMemo(e.target.value)}
                   placeholder="メモ（任意）"
-                  className="w-full text-sm border border-gray-200 rounded-lg px-3 py-2.5" style={{ fontSize: "16px" }} />
+                  className="w-full text-sm rounded px-3 py-2.5 outline-none"
+                  style={{ fontSize: "16px", border: "1px solid var(--border)", color: "var(--ink)" }} />
               </div>
             </div>
 
@@ -491,7 +513,8 @@ export default function AnalysisPage() {
             <button
               onClick={handleEditSave}
               disabled={editSaving || !editAmount || !editCategory}
-              className="w-full py-3.5 rounded-2xl text-base font-black bg-emerald-600 text-white disabled:opacity-40 shadow-lg"
+              className="w-full py-3.5 text-base font-bold disabled:opacity-40 transition-all active:scale-[0.98]"
+              style={{ borderRadius: "4px", backgroundColor: "var(--accent)", color: "#FFFFFF" }}
             >
               {editSaving ? "保存中..." : "保存する"}
             </button>
@@ -500,20 +523,23 @@ export default function AnalysisPage() {
             {!showDeleteConfirm ? (
               <button
                 onClick={() => setShowDeleteConfirm(true)}
-                className="w-full py-2.5 rounded-2xl text-sm font-bold text-red-500 bg-red-50"
+                className="w-full py-2.5 rounded text-sm font-medium"
+                style={{ backgroundColor: "var(--error-light)", color: "var(--error)" }}
               >
                 この支出を削除
               </button>
             ) : (
-              <div className="bg-red-50 rounded-2xl p-4 space-y-3">
-                <p className="text-sm text-gray-700 text-center">この支出を削除しますか？</p>
+              <div className="rounded p-4 space-y-3" style={{ backgroundColor: "var(--error-light)" }}>
+                <p className="text-sm text-center" style={{ color: "var(--ink-light)" }}>この支出を削除しますか？</p>
                 <div className="flex gap-3">
                   <button onClick={() => setShowDeleteConfirm(false)}
-                    className="flex-1 py-2.5 rounded-xl text-sm font-bold bg-gray-100 text-gray-700">
+                    className="flex-1 py-2.5 rounded text-sm font-medium"
+                    style={{ backgroundColor: "var(--warm-gray-100)", color: "var(--ink-light)" }}>
                     キャンセル
                   </button>
                   <button onClick={handleEditDelete}
-                    className="flex-1 py-2.5 rounded-xl text-sm font-bold bg-red-500 text-white">
+                    className="flex-1 py-2.5 rounded text-sm font-medium"
+                    style={{ backgroundColor: "var(--error)", color: "#FFFFFF" }}>
                     削除する
                   </button>
                 </div>

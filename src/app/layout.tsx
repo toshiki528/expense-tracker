@@ -13,14 +13,14 @@ export const viewport: Viewport = {
   initialScale: 1,
   maximumScale: 1,
   userScalable: false,
-  themeColor: "#059669",
+  themeColor: "#2D8A7E",
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="ja">
-      <body className="bg-gray-50 text-gray-900 min-h-screen max-w-screen overflow-x-hidden">
-        <main className="max-w-lg mx-auto px-4 pt-4 pb-24">{children}</main>
+      <body className="min-h-screen max-w-screen overflow-x-hidden">
+        <main className="max-w-lg mx-auto px-5 pt-6 pb-24">{children}</main>
         <BottomNav />
         <script
           dangerouslySetInnerHTML={{

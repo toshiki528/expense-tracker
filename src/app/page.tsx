@@ -145,121 +145,125 @@ export default function HomePage() {
   if (loading) {
     return (
       <div className="flex items-center justify-center h-64">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-emerald-600" />
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2" style={{ borderColor: "var(--accent)" }} />
       </div>
     );
   }
 
   return (
-    <div className="space-y-4 pb-4">
+    <div className="space-y-6 pb-4">
       {/* Period Selector */}
-      <div className="flex items-center justify-between">
-        <button onClick={() => navigate(-1)} className="text-2xl text-gray-400 px-2">‹</button>
-        <h1 className="text-base font-bold text-gray-800">{period.label}</h1>
-        <button onClick={() => navigate(1)} className="text-2xl text-gray-400 px-2">›</button>
+      <div className="flex items-center justify-between px-2">
+        <button onClick={() => navigate(-1)} className="text-xl px-3 py-1" style={{ color: "var(--warm-gray-400)" }}>‹</button>
+        <h1 className="text-sm font-medium tracking-wide" style={{ color: "var(--ink)" }}>{period.label}</h1>
+        <button onClick={() => navigate(1)} className="text-xl px-3 py-1" style={{ color: "var(--warm-gray-400)" }}>›</button>
       </div>
 
       {/* Money Flow Card */}
-      <div className="bg-white rounded-2xl p-4 shadow-sm space-y-2">
-        <h2 className="text-xs font-bold text-gray-500 mb-2">今月のお金の流れ</h2>
+      <div className="card p-6 space-y-3">
+        <h2 className="text-xs font-light tracking-widest uppercase mb-4" style={{ color: "var(--warm-gray-400)" }}>今月のお金の流れ</h2>
 
-        <div className="flex justify-between items-center text-sm">
-          <span className="text-gray-600">手取り収入</span>
+        <div className="flex justify-between items-center">
+          <span className="text-sm font-light" style={{ color: "var(--warm-gray-500)" }}>手取り収入</span>
           {editingIncome ? (
             <div className="flex items-center gap-1">
-              <span className="text-gray-400">¥</span>
+              <span className="font-amount text-sm" style={{ color: "var(--warm-gray-400)" }}>¥</span>
               <input ref={incomeRef} type="number" inputMode="numeric" value={incomeInput}
                 onChange={(e) => setIncomeInput(e.target.value)} onBlur={saveIncome}
                 onKeyDown={(e) => e.key === "Enter" && saveIncome()}
-                className="w-28 text-right font-bold border-b-2 border-emerald-500 outline-none bg-transparent"
-                style={{ fontSize: "16px" }} />
+                className="w-28 text-right font-amount font-semibold outline-none bg-transparent"
+                style={{ fontSize: "16px", borderBottom: "2px solid var(--accent)", color: "var(--ink)" }} />
             </div>
           ) : (
-            <button onClick={startEditIncome} className="font-bold text-gray-800 flex items-center gap-1">
-              ¥{income.toLocaleString()} <span className="text-[10px] text-gray-400">✎</span>
+            <button onClick={startEditIncome} className="font-amount font-semibold flex items-center gap-1.5" style={{ color: "var(--ink)" }}>
+              ¥{income.toLocaleString()} <span className="text-[10px]" style={{ color: "var(--warm-gray-400)" }}>✎</span>
             </button>
           )}
         </div>
-        <div className="border-t border-dashed border-gray-200 my-1" />
 
-        <div className="flex justify-between text-sm">
-          <span className="text-gray-600">- 先取り貯蓄</span>
-          <span className="text-gray-500">-¥{savingsAmount.toLocaleString()}</span>
+        <div style={{ borderTop: "1px dashed var(--border)", margin: "8px 0" }} />
+
+        <div className="flex justify-between items-center">
+          <span className="text-sm font-light" style={{ color: "var(--warm-gray-500)" }}>- 先取り貯蓄</span>
+          <span className="font-amount text-sm" style={{ color: "var(--warm-gray-500)" }}>-¥{savingsAmount.toLocaleString()}</span>
         </div>
         {settings?.savings_source === "kakeibo" && (
-          <p className="text-[10px] text-emerald-500 text-right">家計簿から取得</p>
+          <p className="text-[10px] text-right" style={{ color: "var(--accent)" }}>家計簿から取得</p>
         )}
 
-        <div className="flex justify-between text-sm">
-          <span className="text-gray-600">- 共通固定費（俊樹負担）</span>
-          <span className="text-gray-500">-¥{fixedMyShare.toLocaleString()}</span>
+        <div className="flex justify-between items-center">
+          <span className="text-sm font-light" style={{ color: "var(--warm-gray-500)" }}>- 共通固定費（俊樹負担）</span>
+          <span className="font-amount text-sm" style={{ color: "var(--warm-gray-500)" }}>-¥{fixedMyShare.toLocaleString()}</span>
         </div>
-        <p className="text-[10px] text-emerald-500 text-right">ワリカンから取得</p>
+        <p className="text-[10px] text-right" style={{ color: "var(--accent)" }}>ワリカンから取得</p>
 
-        <div className="flex justify-between text-sm">
-          <span className="text-gray-600">- 個人固定費</span>
-          <span className="text-gray-500">-¥{personalFixedTotal.toLocaleString()}</span>
-        </div>
-
-        <div className="flex justify-between text-sm">
-          <span className="text-gray-600">- 光熱費（俊樹負担）</span>
-          <span className="text-gray-500">-¥{utilityMyShare.toLocaleString()}</span>
-        </div>
-        <p className="text-[10px] text-emerald-500 text-right">ワリカンから取得（{prevMonth.month}月度分）</p>
-
-        <div className="border-t-2 border-emerald-200 my-1" />
-        <div className="flex justify-between text-sm">
-          <span className="font-bold text-emerald-700">= 今月使える額</span>
-          <span className="font-bold text-emerald-700 text-lg">¥{available.toLocaleString()}</span>
+        <div className="flex justify-between items-center">
+          <span className="text-sm font-light" style={{ color: "var(--warm-gray-500)" }}>- 個人固定費</span>
+          <span className="font-amount text-sm" style={{ color: "var(--warm-gray-500)" }}>-¥{personalFixedTotal.toLocaleString()}</span>
         </div>
 
-        <div className="border-t border-dashed border-gray-200 my-1" />
-        <div className="flex justify-between text-sm">
-          <span className="text-gray-600">- 消費合計</span>
-          <span className="text-red-500 font-semibold">-¥{totalSpent.toLocaleString()}</span>
+        <div className="flex justify-between items-center">
+          <span className="text-sm font-light" style={{ color: "var(--warm-gray-500)" }}>- 光熱費（俊樹負担）</span>
+          <span className="font-amount text-sm" style={{ color: "var(--warm-gray-500)" }}>-¥{utilityMyShare.toLocaleString()}</span>
+        </div>
+        <p className="text-[10px] text-right" style={{ color: "var(--accent)" }}>ワリカンから取得（{prevMonth.month}月度分）</p>
+
+        <div style={{ borderTop: "1.5px solid var(--accent-muted)", margin: "10px 0" }} />
+        <div className="flex justify-between items-baseline">
+          <span className="text-sm font-medium" style={{ color: "var(--accent)" }}>= 今月使える額</span>
+          <span className="font-amount font-bold text-lg" style={{ color: "var(--accent)" }}>¥{available.toLocaleString()}</span>
         </div>
 
-        <div className="border-t-2 border-gray-300 my-1" />
-        <div className="flex justify-between">
-          <span className="font-bold text-gray-800">= 残額</span>
-          <span className={`font-black text-2xl ${remaining >= 0 ? "text-emerald-600" : "text-red-600"}`}>
+        <div style={{ borderTop: "1px dashed var(--border)", margin: "8px 0" }} />
+        <div className="flex justify-between items-center">
+          <span className="text-sm font-light" style={{ color: "var(--warm-gray-500)" }}>- 消費合計</span>
+          <span className="font-amount text-sm font-semibold" style={{ color: "var(--error)" }}>-¥{totalSpent.toLocaleString()}</span>
+        </div>
+
+        <div style={{ borderTop: "2px solid var(--border-strong)", margin: "10px 0" }} />
+        <div className="flex justify-between items-baseline">
+          <span className="text-sm font-bold" style={{ color: "var(--ink)" }}>= 残額</span>
+          <span className="font-amount font-extrabold text-3xl" style={{ color: remaining >= 0 ? "var(--ink)" : "var(--error)" }}>
             ¥{remaining.toLocaleString()}
           </span>
         </div>
       </div>
 
       {/* Remaining Balance Card */}
-      <div className={`rounded-2xl p-4 shadow-sm ${remaining >= 0 ? "bg-emerald-50" : "bg-red-50"}`}>
-        <div className="flex justify-between items-end mb-3">
+      <div className="card p-5" style={{ backgroundColor: remaining >= 0 ? "var(--accent-light)" : "var(--error-light)" }}>
+        <div className="flex justify-between items-end mb-4">
           <div>
-            <p className="text-xs text-gray-500">残り{remainingDays}日</p>
-            <p className="text-sm text-gray-600">
-              1日あたり: <span className={`font-bold ${dailyBudget >= 0 ? "text-emerald-700" : "text-red-600"}`}>¥{dailyBudget.toLocaleString()}</span>
+            <p className="text-xs font-light" style={{ color: "var(--warm-gray-500)" }}>残り{remainingDays}日</p>
+            <p className="text-sm mt-0.5" style={{ color: "var(--warm-gray-600)" }}>
+              1日あたり: <span className="font-amount font-bold" style={{ color: dailyBudget >= 0 ? "var(--accent-dark)" : "var(--error)" }}>¥{dailyBudget.toLocaleString()}</span>
             </p>
           </div>
-          <p className="text-xs text-gray-500">{usagePercent}% 使用</p>
+          <p className="font-amount text-xs" style={{ color: "var(--warm-gray-400)" }}>{usagePercent}%</p>
         </div>
-        <div className="w-full bg-gray-200 rounded-full h-3">
+        <div className="w-full rounded-full h-1.5" style={{ backgroundColor: "var(--warm-gray-200)" }}>
           <div
-            className={`h-3 rounded-full transition-all ${usagePercent <= 70 ? "bg-emerald-500" : usagePercent <= 90 ? "bg-yellow-500" : "bg-red-500"}`}
-            style={{ width: `${Math.min(usagePercent, 100)}%` }}
+            className="h-1.5 rounded-full transition-all"
+            style={{
+              width: `${Math.min(usagePercent, 100)}%`,
+              backgroundColor: usagePercent <= 70 ? "var(--accent)" : usagePercent <= 90 ? "var(--warning)" : "var(--error)",
+            }}
           />
         </div>
       </div>
 
       {/* Category Spending */}
       {categorySpending.length > 0 && (
-        <div className="bg-white rounded-2xl p-4 shadow-sm">
-          <h2 className="text-xs font-bold text-gray-500 mb-3">カテゴリ別消費</h2>
-          <div className="space-y-2">
+        <div className="card p-5">
+          <h2 className="text-xs font-light tracking-widest mb-4" style={{ color: "var(--warm-gray-400)" }}>カテゴリ別消費</h2>
+          <div className="space-y-3">
             {categorySpending.map((cat) => (
               <div key={cat.id}>
-                <div className="flex justify-between text-sm mb-0.5">
-                  <span>{cat.icon} {cat.name}</span>
-                  <span className="font-semibold">¥{cat.spent.toLocaleString()}</span>
+                <div className="flex justify-between items-baseline text-sm mb-1">
+                  <span style={{ color: "var(--warm-gray-600)" }}>{cat.icon} {cat.name}</span>
+                  <span className="font-amount font-semibold" style={{ color: "var(--ink)" }}>¥{cat.spent.toLocaleString()}</span>
                 </div>
-                <div className="w-full bg-gray-100 rounded-full h-2">
-                  <div className="h-2 rounded-full bg-emerald-400" style={{ width: `${(cat.spent / maxSpent) * 100}%` }} />
+                <div className="w-full rounded-full h-1" style={{ backgroundColor: "var(--warm-gray-100)" }}>
+                  <div className="h-1 rounded-full" style={{ width: `${(cat.spent / maxSpent) * 100}%`, backgroundColor: "var(--accent)" }} />
                 </div>
               </div>
             ))}
@@ -268,28 +272,28 @@ export default function HomePage() {
       )}
 
       {/* Recent Expenses */}
-      <div className="bg-white rounded-2xl p-4 shadow-sm">
-        <h2 className="text-xs font-bold text-gray-500 mb-3">最近の支出</h2>
+      <div className="card p-5">
+        <h2 className="text-xs font-light tracking-widest mb-4" style={{ color: "var(--warm-gray-400)" }}>最近の支出</h2>
         {allExpenses.length === 0 ? (
-          <p className="text-sm text-gray-400 text-center py-4">まだ記録がありません</p>
+          <p className="text-sm text-center py-6" style={{ color: "var(--warm-gray-300)" }}>まだ記録がありません</p>
         ) : (
-          <div className="space-y-2">
+          <div className="space-y-1">
             {allExpenses.slice(0, 8).map((exp) => {
               const cat = categories.find((c) => c.name === exp.category);
               const isWarikan = exp.source === "warikan";
               const inner = (
-                <div className="flex items-center justify-between py-1.5 border-b border-gray-50 last:border-0">
-                  <div className="flex items-center gap-2">
+                <div className="flex items-center justify-between py-2.5">
+                  <div className="flex items-center gap-3">
                     <span className="text-lg">{cat?.icon || "📦"}</span>
                     <div>
-                      <p className="text-sm text-gray-700">{exp.memo || exp.category}</p>
-                      <p className="text-xs text-gray-400">
+                      <p className="text-sm" style={{ color: "var(--ink-light)" }}>{exp.memo || exp.category}</p>
+                      <p className="text-xs" style={{ color: "var(--warm-gray-400)" }}>
                         {exp.expense_date}
-                        {isWarikan && <span className="ml-1 text-emerald-500">ワリカンから同期</span>}
+                        {isWarikan && <span className="ml-1" style={{ color: "var(--accent)" }}>ワリカンから同期</span>}
                       </p>
                     </div>
                   </div>
-                  <span className="text-sm font-bold text-gray-700">-¥{exp.amount.toLocaleString()}</span>
+                  <span className="font-amount text-sm font-semibold" style={{ color: "var(--ink)" }}>-¥{exp.amount.toLocaleString()}</span>
                 </div>
               );
               return isWarikan ? (

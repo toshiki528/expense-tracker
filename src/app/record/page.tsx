@@ -156,7 +156,7 @@ export default function RecordPage() {
 
     if (!error) {
       localStorage.setItem("lastPaymentMethod", paymentMethod);
-      setToast(`✓ ¥${amountNum.toLocaleString()} 記録しました`);
+      setToast(`¥${amountNum.toLocaleString()} 記録しました`);
       resetCalc();
       setCategory("");
       setMemo("");
@@ -169,61 +169,62 @@ export default function RecordPage() {
   return (
     <>
       {/* Scrollable content area - extra padding for fixed calculator + BottomNav */}
-      <div className="w-full max-w-full overflow-x-hidden space-y-3" style={{ paddingBottom: "340px" }}>
+      <div className="w-full max-w-full overflow-x-hidden space-y-4" style={{ paddingBottom: "340px" }}>
         {/* Amount display */}
-        <div className="bg-white rounded-2xl p-4 shadow-sm">
-          <label className="text-xs text-gray-500 block mb-1">金額</label>
+        <div className="card p-5">
+          <label className="text-xs font-light tracking-wide block mb-1" style={{ color: "var(--warm-gray-400)" }}>金額</label>
           {expression && (
-            <p className="text-xs text-gray-400 text-right mb-0.5">{expression}</p>
+            <p className="text-xs font-amount text-right mb-1" style={{ color: "var(--warm-gray-400)" }}>{expression}</p>
           )}
           <div className="flex items-baseline gap-2 justify-end">
-            <span className="text-xl text-gray-400">¥</span>
-            <span className="text-4xl font-black text-gray-800 tabular-nums" style={{ fontSize: "36px" }}>
-              {display === "0" ? (
-                <span className="text-gray-300">0</span>
-              ) : (
-                parseInt(display).toLocaleString()
-              )}
+            <span className="font-amount text-lg" style={{ color: "var(--warm-gray-300)" }}>¥</span>
+            <span className="font-amount font-extrabold" style={{ fontSize: "38px", color: display === "0" ? "var(--warm-gray-200)" : "var(--ink)" }}>
+              {display === "0" ? "0" : parseInt(display).toLocaleString()}
             </span>
           </div>
         </div>
 
         {/* Category */}
-        <div className="bg-white rounded-2xl p-3 shadow-sm">
-          <label className="text-xs text-gray-500 block mb-2">カテゴリ</label>
-          <div className="grid grid-cols-3 gap-1.5">
+        <div className="card p-4">
+          <label className="text-xs font-light tracking-wide block mb-3" style={{ color: "var(--warm-gray-400)" }}>カテゴリ</label>
+          <div className="grid grid-cols-3 gap-2">
             {categories.map((cat) => (
               <button
                 key={cat.id}
                 type="button"
                 onClick={() => { blurActive(); setCategory(cat.name); }}
-                className={`py-2 rounded-xl text-xs font-bold transition ${
-                  category === cat.name
-                    ? "bg-emerald-600 text-white shadow-md"
-                    : "bg-gray-50 text-gray-700"
-                }`}
+                className="py-2.5 rounded text-xs font-medium transition-all relative"
+                style={{
+                  backgroundColor: category === cat.name ? "var(--accent-light)" : "var(--warm-gray-50)",
+                  color: category === cat.name ? "var(--accent-dark)" : "var(--warm-gray-600)",
+                  border: category === cat.name ? "1px solid var(--accent-muted)" : "1px solid transparent",
+                }}
               >
                 <span className="text-lg block">{cat.icon}</span>
                 {cat.name}
+                {category === cat.name && (
+                  <span className="absolute bottom-0 left-1/2 -translate-x-1/2 w-6 h-[2px] rounded-full" style={{ backgroundColor: "var(--accent)" }} />
+                )}
               </button>
             ))}
           </div>
         </div>
 
         {/* Payment Method */}
-        <div className="bg-white rounded-2xl p-3 shadow-sm">
-          <label className="text-xs text-gray-500 block mb-2">支払い方法</label>
+        <div className="card p-4">
+          <label className="text-xs font-light tracking-wide block mb-3" style={{ color: "var(--warm-gray-400)" }}>支払い方法</label>
           <div className="grid grid-cols-2 gap-2">
             {PAYMENT_METHODS.map((pm) => (
               <button
                 key={pm.key}
                 type="button"
                 onClick={() => { blurActive(); setPaymentMethod(pm.key); }}
-                className={`py-2 rounded-xl text-xs font-bold transition ${
-                  paymentMethod === pm.key
-                    ? "bg-emerald-600 text-white"
-                    : "bg-gray-50 text-gray-600"
-                }`}
+                className="py-2.5 rounded text-xs font-medium transition-all"
+                style={{
+                  backgroundColor: paymentMethod === pm.key ? "var(--accent-light)" : "var(--warm-gray-50)",
+                  color: paymentMethod === pm.key ? "var(--accent-dark)" : "var(--warm-gray-600)",
+                  border: paymentMethod === pm.key ? "1px solid var(--accent-muted)" : "1px solid transparent",
+                }}
               >
                 {pm.icon} {pm.label}
               </button>
@@ -232,27 +233,27 @@ export default function RecordPage() {
         </div>
 
         {/* Date & Memo - compact */}
-        <div className="bg-white rounded-2xl p-3 shadow-sm">
-          <div className="flex gap-2">
+        <div className="card p-4">
+          <div className="flex gap-3">
             <div className="flex-1">
-              <label className="text-xs text-gray-500 block mb-1">日付</label>
+              <label className="text-xs font-light tracking-wide block mb-1.5" style={{ color: "var(--warm-gray-400)" }}>日付</label>
               <input
                 type="date"
                 value={date}
                 onChange={(e) => setDate(e.target.value)}
-                className="w-full text-sm border border-gray-200 rounded-lg px-2 py-2"
-                style={{ fontSize: "16px" }}
+                className="w-full text-sm rounded px-2.5 py-2 outline-none focus:ring-1"
+                style={{ fontSize: "16px", border: "1px solid var(--border)", color: "var(--ink)" }}
               />
             </div>
             <div className="flex-1">
-              <label className="text-xs text-gray-500 block mb-1">メモ</label>
+              <label className="text-xs font-light tracking-wide block mb-1.5" style={{ color: "var(--warm-gray-400)" }}>メモ</label>
               <input
                 type="text"
                 value={memo}
                 onChange={(e) => setMemo(e.target.value)}
                 placeholder="任意"
-                className="w-full text-sm border border-gray-200 rounded-lg px-2 py-2"
-                style={{ fontSize: "16px" }}
+                className="w-full text-sm rounded px-2.5 py-2 outline-none focus:ring-1"
+                style={{ fontSize: "16px", border: "1px solid var(--border)", color: "var(--ink)" }}
               />
             </div>
           </div>
@@ -260,7 +261,7 @@ export default function RecordPage() {
       </div>
 
       {/* Fixed calculator at bottom (above BottomNav) */}
-      <div className="fixed left-0 right-0 z-40 bg-gray-50 border-t border-gray-200 px-3 pt-2 pb-2" style={{ bottom: "56px" }}>
+      <div className="fixed left-0 right-0 z-40 px-3 pt-2 pb-2" style={{ bottom: "56px", backgroundColor: "var(--bg)", borderTop: "1px solid var(--border)" }}>
         <div className="max-w-lg mx-auto">
           {/* Keypad */}
           <div className="grid grid-cols-4 gap-1.5 mb-2">
@@ -274,14 +275,25 @@ export default function RecordPage() {
                 key={k}
                 type="button"
                 onClick={() => calcPress(k)}
-                className={`rounded-xl font-bold active:scale-95 transition select-none text-base ${
-                  s === "n" ? "bg-white text-gray-800 shadow-sm" :
-                  s === "f" ? "bg-gray-200 text-gray-600" :
-                  s === "o" ? "bg-emerald-100 text-emerald-700" :
-                  s === "c" ? "bg-red-100 text-red-600" :
-                  "bg-emerald-600 text-white shadow-sm"
-                }`}
-                style={{ height: "48px" }}
+                className="font-amount font-bold select-none transition-all active:scale-[0.97]"
+                style={{
+                  height: "48px",
+                  borderRadius: "4px",
+                  fontSize: "16px",
+                  backgroundColor:
+                    s === "n" ? "var(--bg-card)" :
+                    s === "f" ? "var(--warm-gray-100)" :
+                    s === "o" ? "var(--accent-light)" :
+                    s === "c" ? "var(--error-light)" :
+                    "var(--accent)",
+                  color:
+                    s === "n" ? "var(--ink)" :
+                    s === "f" ? "var(--warm-gray-600)" :
+                    s === "o" ? "var(--accent-dark)" :
+                    s === "c" ? "var(--error)" :
+                    "#FFFFFF",
+                  border: s === "n" ? "1px solid var(--border)" : "1px solid transparent",
+                }}
               >
                 {l}
               </button>
@@ -292,7 +304,12 @@ export default function RecordPage() {
             type="button"
             onClick={handleSave}
             disabled={saving || !amount || !category}
-            className="w-full py-3 rounded-xl text-base font-black bg-emerald-600 text-white disabled:opacity-40 shadow-md active:scale-95 transition"
+            className="w-full py-3 text-base font-bold transition-all active:scale-[0.98] disabled:opacity-40"
+            style={{
+              borderRadius: "4px",
+              backgroundColor: "var(--accent)",
+              color: "#FFFFFF",
+            }}
           >
             {saving ? "記録中..." : "記録する"}
           </button>
@@ -301,7 +318,8 @@ export default function RecordPage() {
 
       {/* Toast */}
       {toast && (
-        <div className="fixed top-4 left-1/2 -translate-x-1/2 bg-gray-800 text-white px-6 py-3 rounded-full text-sm font-bold shadow-xl z-50 animate-bounce">
+        <div className="fixed top-4 left-1/2 toast-slide-in z-50 font-amount text-sm font-semibold px-6 py-3 rounded-lg"
+          style={{ backgroundColor: "var(--ink)", color: "#FFFFFF", boxShadow: "0 4px 20px rgba(0,0,0,0.15)" }}>
           {toast}
         </div>
       )}
