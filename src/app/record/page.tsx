@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useRef } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { supabase } from "@/lib/supabase";
 import type { PersonalCategory } from "@/lib/supabase";
 
@@ -12,7 +12,6 @@ const PAYMENT_METHODS = [
 ];
 
 export default function RecordPage() {
-  const [amount, setAmount] = useState("");
   const [category, setCategory] = useState("");
   const [paymentMethod, setPaymentMethod] = useState(() => {
     if (typeof window !== "undefined") {
@@ -25,11 +24,66 @@ export default function RecordPage() {
   const [categories, setCategories] = useState<PersonalCategory[]>([]);
   const [saving, setSaving] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
-  const inputRef = useRef<HTMLInputElement>(null);
+
+  // Calculator state
+  const [display, setDisplay] = useState("0");
+  const [pendingValue, setPendingValue] = useState<number | null>(null);
+  const [operator, setOperator] = useState<string | null>(null);
+  const [justCalculated, setJustCalculated] = useState(false);
+
+  const amount = display === "0" ? "" : display;
+
+  const calcPress = useCallback((key: string) => {
+    if (key === "C") {
+      setDisplay("0");
+      setPendingValue(null);
+      setOperator(null);
+      setJustCalculated(false);
+      return;
+    }
+    if (key === "←") {
+      setDisplay((d) => (d.length <= 1 ? "0" : d.slice(0, -1)));
+      setJustCalculated(false);
+      return;
+    }
+    if (key === "+" || key === "−") {
+      const current = parseInt(display) || 0;
+      if (pendingValue !== null && operator) {
+        const result = operator === "+" ? pendingValue + current : pendingValue - current;
+        setPendingValue(result);
+        setDisplay(String(result));
+      } else {
+        setPendingValue(current);
+      }
+      setOperator(key);
+      setJustCalculated(true);
+      return;
+    }
+    if (key === "=") {
+      if (pendingValue !== null && operator) {
+        const current = parseInt(display) || 0;
+        const result = operator === "+" ? pendingValue + current : pendingValue - current;
+        setDisplay(String(Math.max(0, result)));
+        setPendingValue(null);
+        setOperator(null);
+        setJustCalculated(true);
+      }
+      return;
+    }
+    // Number keys (0-9, 00)
+    setDisplay((d) => {
+      if (justCalculated) {
+        setJustCalculated(false);
+        return key === "00" ? "0" : key;
+      }
+      if (d === "0") return key === "00" ? "0" : key;
+      if (d.length >= 8) return d;
+      return d + key;
+    });
+  }, [display, pendingValue, operator, justCalculated]);
 
   useEffect(() => {
     loadCategories();
-    inputRef.current?.focus();
   }, []);
 
   async function loadCategories() {
@@ -57,12 +111,14 @@ export default function RecordPage() {
     if (!error) {
       localStorage.setItem("lastPaymentMethod", paymentMethod);
       setToast(`✓ ¥${amountNum.toLocaleString()} 記録しました`);
-      setAmount("");
+      setDisplay("0");
+      setPendingValue(null);
+      setOperator(null);
+      setJustCalculated(false);
       setCategory("");
       setMemo("");
       setDate(new Date().toISOString().split("T")[0]);
       setTimeout(() => setToast(null), 2500);
-      inputRef.current?.focus();
     }
     setSaving(false);
   };
@@ -71,21 +127,40 @@ export default function RecordPage() {
     <div className="w-full max-w-full overflow-x-hidden space-y-5 pb-4">
       <h1 className="text-lg font-bold text-gray-800">支出を記録</h1>
 
-      {/* Amount */}
-      <div className="bg-white rounded-2xl p-5 shadow-sm">
+      {/* Amount + Calculator */}
+      <div className="bg-white rounded-2xl p-4 shadow-sm">
         <label className="text-xs text-gray-500 block mb-2">金額</label>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 mb-1">
           <span className="text-2xl text-gray-400">¥</span>
-          <input
-            ref={inputRef}
-            type="number"
-            inputMode="numeric"
-            value={amount}
-            onChange={(e) => setAmount(e.target.value)}
-            placeholder="0"
-            className="flex-1 min-w-0 text-3xl font-black text-gray-800 bg-transparent outline-none"
-            style={{ fontSize: "32px" }}
-          />
+          <span className="flex-1 min-w-0 text-3xl font-black text-gray-800" style={{ fontSize: "32px" }}>
+            {display === "0" ? <span className="text-gray-300">0</span> : parseInt(display).toLocaleString()}
+          </span>
+          {operator && (
+            <span className="text-lg font-bold text-emerald-600">{operator === "+" ? "+" : "−"}</span>
+          )}
+        </div>
+        {/* Calculator keypad */}
+        <div className="grid grid-cols-4 gap-2 mt-3">
+          {[
+            { k: "7", style: "num" }, { k: "8", style: "num" }, { k: "9", style: "num" }, { k: "←", style: "fn" },
+            { k: "4", style: "num" }, { k: "5", style: "num" }, { k: "6", style: "num" }, { k: "C", style: "fn" },
+            { k: "1", style: "num" }, { k: "2", style: "num" }, { k: "3", style: "num" }, { k: "−", style: "op" },
+            { k: "0", style: "num" }, { k: "00", style: "num" }, { k: "=", style: "eq" }, { k: "+", style: "op" },
+          ].map(({ k, style }) => (
+            <button
+              key={k}
+              type="button"
+              onClick={() => calcPress(k)}
+              className={`py-3 rounded-xl text-base font-bold active:scale-95 transition ${
+                style === "num" ? "bg-gray-100 text-gray-800" :
+                style === "fn" ? "bg-gray-200 text-gray-600" :
+                style === "op" ? "bg-emerald-100 text-emerald-700" :
+                "bg-emerald-600 text-white"
+              }`}
+            >
+              {k}
+            </button>
+          ))}
         </div>
       </div>
 

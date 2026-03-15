@@ -4,7 +4,6 @@ import { useEffect, useState, useCallback } from "react";
 import { supabase } from "@/lib/supabase";
 import type { PersonalExpense, PersonalCategory, WarikanExpense } from "@/lib/supabase";
 import { getCurrentPeriod, getAdjacentPeriod } from "@/lib/salary-cycle";
-import Link from "next/link";
 import dynamic from "next/dynamic";
 
 const Charts = dynamic(() => import("@/components/AnalysisCharts"), { ssr: false });
@@ -55,6 +54,17 @@ export default function AnalysisPage() {
   const [filter, setFilter] = useState<{ category: string; payment: string }>({ category: "", payment: "" });
   const [aiComment, setAiComment] = useState<string | null>(null);
   const [aiLoading, setAiLoading] = useState(false);
+
+  // Edit modal state
+  const [editingExpense, setEditingExpense] = useState<PersonalExpense | null>(null);
+  const [editAmount, setEditAmount] = useState("");
+  const [editCategory, setEditCategory] = useState("");
+  const [editPayment, setEditPayment] = useState("");
+  const [editMemo, setEditMemo] = useState("");
+  const [editDate, setEditDate] = useState("");
+  const [editSaving, setEditSaving] = useState(false);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [warikanToast, setWarikanToast] = useState(false);
 
   const loadData = useCallback(async () => {
     setLoading(true);
@@ -164,6 +174,49 @@ export default function AnalysisPage() {
     setAiLoading(false);
   };
 
+  const openEditModal = (exp: PersonalExpense) => {
+    setEditingExpense(exp);
+    setEditAmount(String(exp.amount));
+    setEditCategory(exp.category);
+    setEditPayment(exp.payment_method);
+    setEditMemo(exp.memo || "");
+    setEditDate(exp.expense_date);
+    setShowDeleteConfirm(false);
+  };
+
+  const closeEditModal = () => {
+    setEditingExpense(null);
+    setShowDeleteConfirm(false);
+  };
+
+  const handleEditSave = async () => {
+    if (!editingExpense || !editAmount || !editCategory) return;
+    setEditSaving(true);
+    await supabase.from("personal_expenses").update({
+      amount: parseInt(editAmount),
+      category: editCategory,
+      payment_method: editPayment,
+      memo: editMemo.trim() || null,
+      expense_date: editDate,
+      updated_at: new Date().toISOString(),
+    }).eq("id", editingExpense.id);
+    setEditSaving(false);
+    closeEditModal();
+    loadData();
+  };
+
+  const handleEditDelete = async () => {
+    if (!editingExpense) return;
+    await supabase.from("personal_expenses").delete().eq("id", editingExpense.id);
+    closeEditModal();
+    loadData();
+  };
+
+  const EDIT_PAYMENT_METHODS = [
+    { key: "cash", label: "現金等", icon: "💴" },
+    { key: "credit", label: "クレカ", icon: "💳" },
+  ];
+
   if (loading) {
     return (
       <div className="flex items-center justify-center h-64">
@@ -238,15 +291,13 @@ export default function AnalysisPage() {
               const diff = cat.spent - cat.prevSpent;
               return (
                 <div key={cat.name}>
-                  <div className="flex justify-between text-sm mb-1">
-                    <span>{cat.icon} {cat.name}</span>
-                    <span className={`text-xs font-bold ${diff > 0 ? "text-red-500" : diff < 0 ? "text-emerald-500" : "text-gray-400"}`}>
-                      {diff > 0 ? `↑+¥${diff.toLocaleString()}` : diff < 0 ? `↓¥${diff.toLocaleString()}` : "±0"}
+                  <div className="text-sm text-gray-700 mb-0.5">{cat.icon} {cat.name}</div>
+                  <div className="text-lg font-bold text-gray-800">¥{cat.spent.toLocaleString()}</div>
+                  <div className="text-xs text-gray-400">
+                    <span className={diff > 0 ? "text-red-400" : diff < 0 ? "text-emerald-400" : ""}>
+                      先月比 {diff > 0 ? `+¥${diff.toLocaleString()}` : diff < 0 ? `¥${diff.toLocaleString()}` : "±0"}
                     </span>
-                  </div>
-                  <div className="flex gap-1 text-xs text-gray-400">
-                    <span>今月: ¥{cat.spent.toLocaleString()}</span>
-                    <span>/ 先月: ¥{cat.prevSpent.toLocaleString()}</span>
+                    {" / 先月: ¥"}{cat.prevSpent.toLocaleString()}
                   </div>
                 </div>
               );
@@ -306,28 +357,36 @@ export default function AnalysisPage() {
                       {grouped[dateStr].map((exp) => {
                         const cat = categories.find((c) => c.name === exp.category);
                         const isWarikan = exp.source === "warikan";
-                        const inner = (
-                          <div className="flex items-center justify-between py-1.5 px-1 border-b border-gray-50 last:border-0">
-                            <div className="flex items-center gap-2">
-                              <span className="text-lg">{cat?.icon || "📦"}</span>
-                              <div>
-                                <p className="text-sm text-gray-700">{exp.memo || exp.category}</p>
-                                <p className="text-xs text-gray-400">
-                                  {isWarikan ? (
-                                    <span className="text-emerald-500">ワリカンから同期</span>
-                                  ) : (
-                                    "payment_method" in exp && <span>{PAYMENT_LABELS[(exp as PersonalExpense).payment_method] || (exp as PersonalExpense).payment_method}</span>
-                                  )}
-                                </p>
+                        return (
+                          <button
+                            key={exp.id}
+                            className="w-full text-left"
+                            onClick={() => {
+                              if (isWarikan) {
+                                setWarikanToast(true);
+                                setTimeout(() => setWarikanToast(false), 2500);
+                              } else {
+                                openEditModal(exp as PersonalExpense);
+                              }
+                            }}
+                          >
+                            <div className="flex items-center justify-between py-1.5 px-1 border-b border-gray-50 last:border-0 active:bg-gray-50 transition">
+                              <div className="flex items-center gap-2">
+                                <span className="text-lg">{cat?.icon || "📦"}</span>
+                                <div>
+                                  <p className="text-sm text-gray-700">{exp.memo || exp.category}</p>
+                                  <p className="text-xs text-gray-400">
+                                    {isWarikan ? (
+                                      <span className="text-emerald-500">ワリカンから同期</span>
+                                    ) : (
+                                      "payment_method" in exp && <span>{PAYMENT_LABELS[(exp as PersonalExpense).payment_method] || (exp as PersonalExpense).payment_method}</span>
+                                    )}
+                                  </p>
+                                </div>
                               </div>
+                              <span className="text-sm font-bold text-gray-700">-¥{exp.amount.toLocaleString()}</span>
                             </div>
-                            <span className="text-sm font-bold text-gray-700">-¥{exp.amount.toLocaleString()}</span>
-                          </div>
-                        );
-                        return isWarikan ? (
-                          <div key={exp.id}>{inner}</div>
-                        ) : (
-                          <Link key={exp.id} href={`/record/${exp.id}`}>{inner}</Link>
+                          </button>
                         );
                       })}
                     </div>
@@ -338,6 +397,131 @@ export default function AnalysisPage() {
           );
         })()}
       </div>
+
+      {/* Warikan toast */}
+      {warikanToast && (
+        <div className="fixed top-4 left-1/2 -translate-x-1/2 bg-gray-800 text-white px-6 py-3 rounded-full text-sm font-bold shadow-xl z-50">
+          ワリカンアプリで変更してください
+        </div>
+      )}
+
+      {/* Edit Modal */}
+      {editingExpense && (
+        <div className="fixed inset-0 bg-black/50 flex items-end justify-center z-50" onClick={closeEditModal}>
+          <div className="bg-white rounded-t-2xl w-full max-w-lg p-5 space-y-4 max-h-[85vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-center justify-between mb-1">
+              <h2 className="text-base font-bold text-gray-800">支出を編集</h2>
+              <button onClick={closeEditModal} className="text-sm text-gray-400">✕</button>
+            </div>
+
+            {/* Amount */}
+            <div>
+              <label className="text-xs text-gray-500 block mb-1">金額</label>
+              <div className="flex items-center gap-2">
+                <span className="text-xl text-gray-400">¥</span>
+                <input
+                  type="number"
+                  inputMode="numeric"
+                  value={editAmount}
+                  onChange={(e) => setEditAmount(e.target.value)}
+                  className="flex-1 text-2xl font-black text-gray-800 bg-transparent outline-none"
+                  style={{ fontSize: "28px" }}
+                />
+              </div>
+            </div>
+
+            {/* Category */}
+            <div>
+              <label className="text-xs text-gray-500 block mb-2">カテゴリ</label>
+              <div className="grid grid-cols-3 gap-2">
+                {categories.map((cat) => (
+                  <button
+                    key={cat.id}
+                    onClick={() => setEditCategory(cat.name)}
+                    className={`py-2.5 rounded-xl text-xs font-bold transition ${
+                      editCategory === cat.name
+                        ? "bg-emerald-600 text-white shadow-md"
+                        : "bg-gray-50 text-gray-700"
+                    }`}
+                  >
+                    <span className="text-lg block mb-0.5">{cat.icon}</span>
+                    {cat.name}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Payment Method */}
+            <div>
+              <label className="text-xs text-gray-500 block mb-2">支払い方法</label>
+              <div className="grid grid-cols-2 gap-2">
+                {EDIT_PAYMENT_METHODS.map((pm) => (
+                  <button
+                    key={pm.key}
+                    onClick={() => setEditPayment(pm.key)}
+                    className={`py-2.5 rounded-xl text-xs font-bold transition ${
+                      editPayment === pm.key
+                        ? "bg-emerald-600 text-white"
+                        : "bg-gray-50 text-gray-600"
+                    }`}
+                  >
+                    <span className="text-base block">{pm.icon}</span>
+                    {pm.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Date & Memo */}
+            <div className="space-y-3">
+              <div>
+                <label className="text-xs text-gray-500 block mb-1">日付</label>
+                <input type="date" value={editDate} onChange={(e) => setEditDate(e.target.value)}
+                  className="w-full text-sm border border-gray-200 rounded-lg px-3 py-2.5" style={{ fontSize: "16px" }} />
+              </div>
+              <div>
+                <label className="text-xs text-gray-500 block mb-1">メモ</label>
+                <input type="text" value={editMemo} onChange={(e) => setEditMemo(e.target.value)}
+                  placeholder="メモ（任意）"
+                  className="w-full text-sm border border-gray-200 rounded-lg px-3 py-2.5" style={{ fontSize: "16px" }} />
+              </div>
+            </div>
+
+            {/* Save */}
+            <button
+              onClick={handleEditSave}
+              disabled={editSaving || !editAmount || !editCategory}
+              className="w-full py-3.5 rounded-2xl text-base font-black bg-emerald-600 text-white disabled:opacity-40 shadow-lg"
+            >
+              {editSaving ? "保存中..." : "保存する"}
+            </button>
+
+            {/* Delete */}
+            {!showDeleteConfirm ? (
+              <button
+                onClick={() => setShowDeleteConfirm(true)}
+                className="w-full py-2.5 rounded-2xl text-sm font-bold text-red-500 bg-red-50"
+              >
+                この支出を削除
+              </button>
+            ) : (
+              <div className="bg-red-50 rounded-2xl p-4 space-y-3">
+                <p className="text-sm text-gray-700 text-center">この支出を削除しますか？</p>
+                <div className="flex gap-3">
+                  <button onClick={() => setShowDeleteConfirm(false)}
+                    className="flex-1 py-2.5 rounded-xl text-sm font-bold bg-gray-100 text-gray-700">
+                    キャンセル
+                  </button>
+                  <button onClick={handleEditDelete}
+                    className="flex-1 py-2.5 rounded-xl text-sm font-bold bg-red-500 text-white">
+                    削除する
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   );
 }
