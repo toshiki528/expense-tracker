@@ -34,7 +34,6 @@ export default function RecordPage() {
 
   const amount = display === "0" ? "" : display;
 
-  // Blur any focused element to prevent OS keyboard
   const blurActive = () => {
     if (document.activeElement instanceof HTMLElement) {
       document.activeElement.blur();
@@ -56,18 +55,14 @@ export default function RecordPage() {
       resetCalc();
       return;
     }
-
     if (key === "back") {
-      if (freshRef.current) return; // don't delete after = or op
+      if (freshRef.current) return;
       setDisplay((d) => (d.length <= 1 ? "0" : d.slice(0, -1)));
       return;
     }
-
     if (key === "+" || key === "-") {
       const current = parseInt(display) || 0;
-
       if (pendingRef.current !== null && opRef.current && !freshRef.current) {
-        // Chain: compute previous, then set new op
         const result =
           opRef.current === "+"
             ? pendingRef.current + current
@@ -75,19 +70,18 @@ export default function RecordPage() {
         pendingRef.current = result;
         opRef.current = key;
         freshRef.current = true;
-        const opSymbol = key === "+" ? "+" : "−";
-        setExpression(`${result.toLocaleString()} ${opSymbol}`);
+        const sym = key === "+" ? "+" : "−";
+        setExpression(`${result.toLocaleString()} ${sym}`);
         setDisplay(String(result));
       } else {
         pendingRef.current = current;
         opRef.current = key;
         freshRef.current = true;
-        const opSymbol = key === "+" ? "+" : "−";
-        setExpression(`${current.toLocaleString()} ${opSymbol}`);
+        const sym = key === "+" ? "+" : "−";
+        setExpression(`${current.toLocaleString()} ${sym}`);
       }
       return;
     }
-
     if (key === "=") {
       if (pendingRef.current !== null && opRef.current) {
         const current = parseInt(display) || 0;
@@ -95,45 +89,40 @@ export default function RecordPage() {
           opRef.current === "+"
             ? pendingRef.current + current
             : pendingRef.current - current;
-        const safeResult = Math.max(0, result);
         pendingRef.current = null;
         opRef.current = null;
         freshRef.current = true;
         setExpression(null);
-        setDisplay(String(safeResult));
+        setDisplay(String(Math.max(0, result)));
       }
       return;
     }
-
     // Number keys: 0-9, 00
     if (freshRef.current) {
       freshRef.current = false;
-      // Update expression to show the new number being typed
+      const digit = key === "00" ? "0" : key;
       if (pendingRef.current !== null && opRef.current) {
-        const opSymbol = opRef.current === "+" ? "+" : "−";
-        const newDigit = key === "00" ? "0" : key;
-        setExpression(`${pendingRef.current.toLocaleString()} ${opSymbol} ${newDigit}`);
+        const sym = opRef.current === "+" ? "+" : "−";
+        setExpression(`${pendingRef.current.toLocaleString()} ${sym} ${digit}`);
       }
-      setDisplay(key === "00" ? "0" : key);
+      setDisplay(digit);
     } else {
       setDisplay((d) => {
         if (d === "0") {
-          const newVal = key === "00" ? "0" : key;
+          const v = key === "00" ? "0" : key;
           if (pendingRef.current !== null && opRef.current) {
-            const opSymbol = opRef.current === "+" ? "+" : "−";
-            setExpression(`${pendingRef.current.toLocaleString()} ${opSymbol} ${newVal}`);
+            const sym = opRef.current === "+" ? "+" : "−";
+            setExpression(`${pendingRef.current.toLocaleString()} ${sym} ${v}`);
           }
-          return newVal;
+          return v;
         }
         if (d.length >= 8) return d;
-        const newVal = d + key;
+        const v = d + key;
         if (pendingRef.current !== null && opRef.current) {
-          const opSymbol = opRef.current === "+" ? "+" : "−";
-          setExpression(
-            `${pendingRef.current.toLocaleString()} ${opSymbol} ${parseInt(newVal).toLocaleString()}`
-          );
+          const sym = opRef.current === "+" ? "+" : "−";
+          setExpression(`${pendingRef.current.toLocaleString()} ${sym} ${parseInt(v).toLocaleString()}`);
         }
-        return newVal;
+        return v;
       });
     }
   };
@@ -177,153 +166,138 @@ export default function RecordPage() {
     setSaving(false);
   };
 
-  const CAL_KEYS = [
-    { k: "7", label: "7", s: "num" },
-    { k: "8", label: "8", s: "num" },
-    { k: "9", label: "9", s: "num" },
-    { k: "back", label: "⌫", s: "fn" },
-    { k: "4", label: "4", s: "num" },
-    { k: "5", label: "5", s: "num" },
-    { k: "6", label: "6", s: "num" },
-    { k: "+", label: "+", s: "op" },
-    { k: "1", label: "1", s: "num" },
-    { k: "2", label: "2", s: "num" },
-    { k: "3", label: "3", s: "num" },
-    { k: "-", label: "−", s: "op" },
-    { k: "C", label: "C", s: "clear" },
-    { k: "0", label: "0", s: "num" },
-    { k: "00", label: "00", s: "num" },
-    { k: "=", label: "=", s: "eq" },
-  ];
-
   return (
-    <div className="w-full max-w-full overflow-x-hidden flex flex-col pb-4">
-      {/* Amount display */}
-      <div className="bg-white rounded-2xl p-4 shadow-sm mb-4">
-        <label className="text-xs text-gray-500 block mb-1">金額</label>
-        {expression && (
-          <p className="text-xs text-gray-400 text-right mb-0.5">{expression}</p>
-        )}
-        <div className="flex items-baseline gap-2 justify-end">
-          <span className="text-xl text-gray-400">¥</span>
-          <span
-            className="text-4xl font-black text-gray-800 tabular-nums"
-            style={{ fontSize: "36px", lineHeight: 1.2 }}
+    <>
+      {/* Scrollable content area - extra padding for fixed calculator + BottomNav */}
+      <div className="w-full max-w-full overflow-x-hidden space-y-3" style={{ paddingBottom: "340px" }}>
+        {/* Amount display */}
+        <div className="bg-white rounded-2xl p-4 shadow-sm">
+          <label className="text-xs text-gray-500 block mb-1">金額</label>
+          {expression && (
+            <p className="text-xs text-gray-400 text-right mb-0.5">{expression}</p>
+          )}
+          <div className="flex items-baseline gap-2 justify-end">
+            <span className="text-xl text-gray-400">¥</span>
+            <span className="text-4xl font-black text-gray-800 tabular-nums" style={{ fontSize: "36px" }}>
+              {display === "0" ? (
+                <span className="text-gray-300">0</span>
+              ) : (
+                parseInt(display).toLocaleString()
+              )}
+            </span>
+          </div>
+        </div>
+
+        {/* Category */}
+        <div className="bg-white rounded-2xl p-3 shadow-sm">
+          <label className="text-xs text-gray-500 block mb-2">カテゴリ</label>
+          <div className="grid grid-cols-3 gap-1.5">
+            {categories.map((cat) => (
+              <button
+                key={cat.id}
+                type="button"
+                onClick={() => { blurActive(); setCategory(cat.name); }}
+                className={`py-2 rounded-xl text-xs font-bold transition ${
+                  category === cat.name
+                    ? "bg-emerald-600 text-white shadow-md"
+                    : "bg-gray-50 text-gray-700"
+                }`}
+              >
+                <span className="text-lg block">{cat.icon}</span>
+                {cat.name}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {/* Payment Method */}
+        <div className="bg-white rounded-2xl p-3 shadow-sm">
+          <label className="text-xs text-gray-500 block mb-2">支払い方法</label>
+          <div className="grid grid-cols-2 gap-2">
+            {PAYMENT_METHODS.map((pm) => (
+              <button
+                key={pm.key}
+                type="button"
+                onClick={() => { blurActive(); setPaymentMethod(pm.key); }}
+                className={`py-2 rounded-xl text-xs font-bold transition ${
+                  paymentMethod === pm.key
+                    ? "bg-emerald-600 text-white"
+                    : "bg-gray-50 text-gray-600"
+                }`}
+              >
+                {pm.icon} {pm.label}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {/* Date & Memo - compact */}
+        <div className="bg-white rounded-2xl p-3 shadow-sm">
+          <div className="flex gap-2">
+            <div className="flex-1">
+              <label className="text-xs text-gray-500 block mb-1">日付</label>
+              <input
+                type="date"
+                value={date}
+                onChange={(e) => setDate(e.target.value)}
+                className="w-full text-sm border border-gray-200 rounded-lg px-2 py-2"
+                style={{ fontSize: "16px" }}
+              />
+            </div>
+            <div className="flex-1">
+              <label className="text-xs text-gray-500 block mb-1">メモ</label>
+              <input
+                type="text"
+                value={memo}
+                onChange={(e) => setMemo(e.target.value)}
+                placeholder="任意"
+                className="w-full text-sm border border-gray-200 rounded-lg px-2 py-2"
+                style={{ fontSize: "16px" }}
+              />
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Fixed calculator at bottom (above BottomNav) */}
+      <div className="fixed left-0 right-0 z-40 bg-gray-50 border-t border-gray-200 px-3 pt-2 pb-2" style={{ bottom: "56px" }}>
+        <div className="max-w-lg mx-auto">
+          {/* Keypad */}
+          <div className="grid grid-cols-4 gap-1.5 mb-2">
+            {[
+              { k: "7", l: "7", s: "n" }, { k: "8", l: "8", s: "n" }, { k: "9", l: "9", s: "n" }, { k: "back", l: "⌫", s: "f" },
+              { k: "4", l: "4", s: "n" }, { k: "5", l: "5", s: "n" }, { k: "6", l: "6", s: "n" }, { k: "+", l: "+", s: "o" },
+              { k: "1", l: "1", s: "n" }, { k: "2", l: "2", s: "n" }, { k: "3", l: "3", s: "n" }, { k: "-", l: "−", s: "o" },
+              { k: "C", l: "C", s: "c" }, { k: "0", l: "0", s: "n" }, { k: "00", l: "00", s: "n" }, { k: "=", l: "=", s: "e" },
+            ].map(({ k, l, s }) => (
+              <button
+                key={k}
+                type="button"
+                onClick={() => calcPress(k)}
+                className={`rounded-xl font-bold active:scale-95 transition select-none text-base ${
+                  s === "n" ? "bg-white text-gray-800 shadow-sm" :
+                  s === "f" ? "bg-gray-200 text-gray-600" :
+                  s === "o" ? "bg-emerald-100 text-emerald-700" :
+                  s === "c" ? "bg-red-100 text-red-600" :
+                  "bg-emerald-600 text-white shadow-sm"
+                }`}
+                style={{ height: "48px" }}
+              >
+                {l}
+              </button>
+            ))}
+          </div>
+          {/* Save */}
+          <button
+            type="button"
+            onClick={handleSave}
+            disabled={saving || !amount || !category}
+            className="w-full py-3 rounded-xl text-base font-black bg-emerald-600 text-white disabled:opacity-40 shadow-md active:scale-95 transition"
           >
-            {display === "0" ? (
-              <span className="text-gray-300">0</span>
-            ) : (
-              parseInt(display).toLocaleString()
-            )}
-          </span>
+            {saving ? "記録中..." : "記録する"}
+          </button>
         </div>
       </div>
-
-      {/* Category */}
-      <div className="bg-white rounded-2xl p-4 shadow-sm mb-4">
-        <label className="text-xs text-gray-500 block mb-3">カテゴリ</label>
-        <div className="grid grid-cols-3 gap-2">
-          {categories.map((cat) => (
-            <button
-              key={cat.id}
-              type="button"
-              onClick={() => { blurActive(); setCategory(cat.name); }}
-              className={`py-3 rounded-xl text-sm font-bold transition ${
-                category === cat.name
-                  ? "bg-emerald-600 text-white shadow-md"
-                  : "bg-gray-50 text-gray-700"
-              }`}
-            >
-              <span className="text-xl block mb-0.5">{cat.icon}</span>
-              {cat.name}
-            </button>
-          ))}
-        </div>
-      </div>
-
-      {/* Payment Method */}
-      <div className="bg-white rounded-2xl p-4 shadow-sm mb-4">
-        <label className="text-xs text-gray-500 block mb-3">支払い方法</label>
-        <div className="grid grid-cols-2 gap-2">
-          {PAYMENT_METHODS.map((pm) => (
-            <button
-              key={pm.key}
-              type="button"
-              onClick={() => { blurActive(); setPaymentMethod(pm.key); }}
-              className={`py-3 rounded-xl text-sm font-bold transition ${
-                paymentMethod === pm.key
-                  ? "bg-emerald-600 text-white"
-                  : "bg-gray-50 text-gray-600"
-              }`}
-            >
-              <span className="text-base block">{pm.icon}</span>
-              {pm.label}
-            </button>
-          ))}
-        </div>
-      </div>
-
-      {/* Date & Memo */}
-      <div className="bg-white rounded-2xl p-4 shadow-sm mb-4 space-y-3">
-        <div>
-          <label className="text-xs text-gray-500 block mb-1">日付</label>
-          <input
-            type="date"
-            value={date}
-            onChange={(e) => setDate(e.target.value)}
-            className="w-full text-sm border border-gray-200 rounded-lg px-3 py-2.5"
-            style={{ fontSize: "16px" }}
-          />
-        </div>
-        <div>
-          <label className="text-xs text-gray-500 block mb-1">メモ</label>
-          <input
-            type="text"
-            value={memo}
-            onChange={(e) => setMemo(e.target.value)}
-            placeholder="メモ（任意）"
-            className="w-full text-sm border border-gray-200 rounded-lg px-3 py-2.5"
-            style={{ fontSize: "16px" }}
-          />
-        </div>
-      </div>
-
-      {/* Calculator keypad - fixed bottom area */}
-      <div className="bg-white rounded-2xl p-3 shadow-sm mb-3">
-        <div className="grid grid-cols-4 gap-2">
-          {CAL_KEYS.map(({ k, label, s }) => (
-            <button
-              key={k}
-              type="button"
-              onClick={() => calcPress(k)}
-              className={`rounded-xl text-lg font-bold active:scale-95 transition select-none ${
-                s === "num"
-                  ? "bg-gray-100 text-gray-800"
-                  : s === "fn"
-                    ? "bg-gray-200 text-gray-600"
-                    : s === "op"
-                      ? "bg-emerald-100 text-emerald-700"
-                      : s === "clear"
-                        ? "bg-red-100 text-red-600"
-                        : "bg-emerald-600 text-white"
-              }`}
-              style={{ minHeight: "52px" }}
-            >
-              {label}
-            </button>
-          ))}
-        </div>
-      </div>
-
-      {/* Save Button */}
-      <button
-        type="button"
-        onClick={handleSave}
-        disabled={saving || !amount || !category}
-        className="w-full py-4 rounded-2xl text-lg font-black bg-emerald-600 text-white disabled:opacity-40 shadow-lg active:scale-95 transition"
-      >
-        {saving ? "記録中..." : "記録する"}
-      </button>
 
       {/* Toast */}
       {toast && (
@@ -331,6 +305,6 @@ export default function RecordPage() {
           {toast}
         </div>
       )}
-    </div>
+    </>
   );
 }
