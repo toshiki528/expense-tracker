@@ -4,7 +4,7 @@ import { useEffect, useState, useRef } from "react";
 import { supabase } from "@/lib/supabase";
 import type { PersonalCategory } from "@/lib/supabase";
 
-const SYNC_CATEGORIES = ["共通買い物", "個人消費"];
+const SYNC_CATEGORIES = ["共通食費", "共通日用品", "共通医療品", "個人消費"];
 
 const PAYMENT_METHODS = [
   { key: "cash", label: "現金等", icon: "💴" },

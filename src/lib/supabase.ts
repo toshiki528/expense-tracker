@@ -75,6 +75,8 @@ export type Receipt = {
   receipt_total: number;
   personal_total: number;
   shared_total: number;
+  daily_items_total: number;
+  medical_items_total: number;
   settled: boolean;
 };
 

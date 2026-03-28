@@ -8,6 +8,13 @@ import Link from "next/link";
 
 type AnyExpense = (PersonalExpense | WarikanExpense) & { source?: "warikan" };
 
+const SYNC_ICON_MAP: Record<string, string> = {
+  "共通食費": "🍚",
+  "共通日用品": "🧴",
+  "共通医療品": "🏥",
+  "個人消費": "🙋",
+};
+
 export default function HomePage() {
   const [period, setPeriod] = useState(getCurrentPeriod());
   const [settings, setSettings] = useState<PersonalSettings | null>(null);
@@ -57,12 +64,34 @@ export default function HomePage() {
     const wExpenses: WarikanExpense[] = [];
     if (receipts) {
       for (const r of receipts) {
-        const sharedShare = Math.floor(r.shared_total / 2);
-        if (sharedShare > 0) {
+        const foodShare = Math.floor(r.shared_total / 2);
+        if (foodShare > 0) {
           wExpenses.push({
-            id: `w-shared-${r.id}`,
-            amount: sharedShare,
-            category: "共通買い物",
+            id: `w-food-${r.id}`,
+            amount: foodShare,
+            category: "共通食費",
+            memo: r.store_name,
+            expense_date: r.date,
+            source: "warikan",
+          });
+        }
+        const dailyShare = Math.floor((r.daily_items_total || 0) / 2);
+        if (dailyShare > 0) {
+          wExpenses.push({
+            id: `w-daily-${r.id}`,
+            amount: dailyShare,
+            category: "共通日用品",
+            memo: r.store_name,
+            expense_date: r.date,
+            source: "warikan",
+          });
+        }
+        const medicalShare = Math.floor((r.medical_items_total || 0) / 2);
+        if (medicalShare > 0) {
+          wExpenses.push({
+            id: `w-medical-${r.id}`,
+            amount: medicalShare,
+            category: "共通医療品",
             memo: r.store_name,
             expense_date: r.date,
             source: "warikan",
@@ -284,7 +313,7 @@ export default function HomePage() {
               const inner = (
                 <div className="flex items-center justify-between py-2.5">
                   <div className="flex items-center gap-3">
-                    <span className="text-lg">{cat?.icon || "📦"}</span>
+                    <span className="text-lg">{cat?.icon || SYNC_ICON_MAP[exp.category] || "📦"}</span>
                     <div>
                       <p className="text-sm" style={{ color: "var(--ink-light)" }}>{exp.memo || exp.category}</p>
                       <p className="text-xs" style={{ color: "var(--warm-gray-400)" }}>
