@@ -3,10 +3,17 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 
-const tabs = [
+type NavTab = {
+  href: string;
+  activeHref?: string;
+  label: string;
+  icon: string;
+};
+
+const tabs: NavTab[] = [
   { href: "/", label: "ホーム", icon: "🏠" },
   { href: "/fixed-costs", label: "固定費", icon: "💸" },
-  { href: "/record", label: "記録", icon: "📋" },
+  { href: "/record?input=1", activeHref: "/record", label: "記録", icon: "📋" },
   { href: "/settings", label: "設定", icon: "⚙️" },
 ];
 
@@ -17,11 +24,19 @@ export default function BottomNav() {
     <nav className="fixed bottom-0 left-0 right-0 z-50" style={{ backgroundColor: "rgba(255,255,255,0.92)", backdropFilter: "blur(8px)", WebkitBackdropFilter: "blur(8px)", borderTop: "1px solid var(--border)" }}>
       <div className="max-w-lg mx-auto flex">
         {tabs.map((tab) => {
-          const isActive = tab.href === "/" ? pathname === "/" : pathname.startsWith(tab.href);
+          const activeHref = tab.activeHref ?? tab.href;
+          const isActive = activeHref === "/" ? pathname === "/" : pathname.startsWith(activeHref);
+          const opensRecordInput = activeHref === "/record";
           return (
             <Link
               key={tab.href}
               href={tab.href}
+              onClick={(event) => {
+                if (opensRecordInput && pathname.startsWith("/record")) {
+                  event.preventDefault();
+                  window.dispatchEvent(new CustomEvent("open-record-entry"));
+                }
+              }}
               className="flex-1 flex flex-col items-center relative py-2.5 transition-colors"
               style={{ color: isActive ? "var(--accent)" : "var(--warm-gray-400)" }}
             >

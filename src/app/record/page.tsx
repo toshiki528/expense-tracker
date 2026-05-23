@@ -32,7 +32,11 @@ function isRecordTab(value: string | null): value is RecordTab {
 }
 
 function todayString() {
-  return new Date().toISOString().split("T")[0];
+  const today = new Date();
+  const year = today.getFullYear();
+  const month = String(today.getMonth() + 1).padStart(2, "0");
+  const date = String(today.getDate()).padStart(2, "0");
+  return `${year}-${month}-${date}`;
 }
 
 function dateInRange(date: string, start: string, end: string) {
@@ -46,6 +50,8 @@ export default function RecordPage() {
   const [loading, setLoading] = useState(true);
   const [selectedDate, setSelectedDate] = useState("");
   const selectedDateRef = useRef("");
+  const pendingOpenInputRef = useRef(false);
+  const autoScrolledPeriodRef = useRef("");
   const [expandedDates, setExpandedDates] = useState<string[]>([]);
   const [expandedCategories, setExpandedCategories] = useState<string[]>([]);
   const [entryOpen, setEntryOpen] = useState(false);
@@ -208,15 +214,19 @@ export default function RecordPage() {
     }
   };
 
-  const getDefaultEntryDate = () => {
+  const getDefaultEntryDate = useCallback(() => {
     if (!ledger) return todayString();
-    if (selectedDate && dateInRange(selectedDate, ledger.context.startDate, ledger.context.endDate)) return selectedDate;
     const today = todayString();
-    return dateInRange(today, ledger.context.startDate, ledger.context.endDate) ? today : ledger.context.startDate;
-  };
+    if (dateInRange(today, ledger.context.startDate, ledger.context.endDate)) return today;
+    if (selectedDate && dateInRange(selectedDate, ledger.context.startDate, ledger.context.endDate)) return selectedDate;
+    return ledger.context.startDate;
+  }, [ledger, selectedDate]);
 
-  const openEntrySheet = (entryDate?: string, item?: LedgerItem) => {
-    if (!ledger) return;
+  const openEntrySheet = useCallback((entryDate?: string, item?: LedgerItem) => {
+    if (!ledger) {
+      pendingOpenInputRef.current = true;
+      return;
+    }
     if (ledger.context.isLocked) {
       showToast("確定済み月のため編集できません");
       return;
@@ -240,7 +250,49 @@ export default function RecordPage() {
     setMemo(item?.memo || "");
     setCalcAmount(item?.amount || 0);
     setEntryOpen(true);
-  };
+  }, [category, getDefaultEntryDate, ledger]);
+
+  useEffect(() => {
+    if (!ledger) return;
+    const openRequestedInput = () => {
+      pendingOpenInputRef.current = false;
+      openEntrySheet();
+    };
+
+    const params = new URLSearchParams(window.location.search);
+    if (params.get("input") === "1") {
+      openRequestedInput();
+      params.delete("input");
+      const query = params.toString();
+      window.history.replaceState(null, "", query ? `/record?${query}` : "/record");
+      return;
+    }
+
+    if (pendingOpenInputRef.current) openRequestedInput();
+  }, [ledger, openEntrySheet]);
+
+  useEffect(() => {
+    const handleOpenRecordEntry = () => {
+      if (!ledger) {
+        pendingOpenInputRef.current = true;
+        return;
+      }
+      openEntrySheet();
+    };
+
+    window.addEventListener("open-record-entry", handleOpenRecordEntry);
+    return () => window.removeEventListener("open-record-entry", handleOpenRecordEntry);
+  }, [ledger, openEntrySheet]);
+
+  useEffect(() => {
+    if (!ledger || activeTab !== "daily" || entryOpen || !selectedDate) return;
+    const scrollKey = `${ledger.context.period}:${selectedDate}`;
+    if (autoScrolledPeriodRef.current === scrollKey) return;
+    autoScrolledPeriodRef.current = scrollKey;
+    window.setTimeout(() => {
+      document.querySelector(`[data-ledger-date="${selectedDate}"]`)?.scrollIntoView({ block: "center" });
+    }, 120);
+  }, [activeTab, entryOpen, ledger, selectedDate]);
 
   const closeEntrySheet = () => {
     setEntryOpen(false);
@@ -492,7 +544,12 @@ function DailyTab({
         const expanded = expandedDates.includes(day.date);
         const isSelected = selectedDate === day.date;
         return (
-          <section key={day.date} className="card overflow-hidden" style={{ opacity: day.total === 0 ? 0.58 : 1 }}>
+          <section
+            key={day.date}
+            data-ledger-date={day.date}
+            className="card overflow-hidden scroll-mt-24"
+            style={{ opacity: day.total === 0 ? 0.58 : 1 }}
+          >
             <button
               type="button"
               onClick={() => onToggleDate(day.date)}
@@ -881,9 +938,9 @@ function EntrySheet({
   onSave: () => void;
 }) {
   return (
-    <div className="fixed inset-0 bg-black/40 z-50 flex items-end justify-center" onClick={onClose}>
+    <div className="fixed inset-0 bg-black/40 z-[80] flex items-end justify-center" onClick={onClose}>
       <div
-        className="w-full max-w-lg max-h-[92vh] overflow-y-auto rounded-t-lg p-4 space-y-4"
+        className="w-full max-w-lg max-h-[calc(100dvh-12px)] overflow-y-auto rounded-t-lg p-4 pb-0 space-y-4"
         style={{ backgroundColor: "var(--bg)", border: "1px solid var(--border)", borderBottom: "none" }}
         onClick={(e) => e.stopPropagation()}
       >
@@ -1004,15 +1061,20 @@ function EntrySheet({
           ))}
         </div>
 
-        <button
-          type="button"
-          onClick={onSave}
-          disabled={saving || !amount || !category}
-          className="w-full py-3.5 text-base font-bold disabled:opacity-40 active:scale-[0.98]"
-          style={{ borderRadius: "4px", backgroundColor: "var(--accent)", color: "#FFFFFF" }}
+        <div
+          className="sticky bottom-0 -mx-4 px-4 pt-2"
+          style={{ backgroundColor: "var(--bg)", paddingBottom: "calc(16px + env(safe-area-inset-bottom))" }}
         >
-          {saving ? "保存中..." : editing ? "更新する" : "記録する"}
-        </button>
+          <button
+            type="button"
+            onClick={onSave}
+            disabled={saving || !amount || !category}
+            className="w-full py-3.5 text-base font-bold disabled:opacity-40 active:scale-[0.98]"
+            style={{ borderRadius: "4px", backgroundColor: "var(--accent)", color: "#FFFFFF" }}
+          >
+            {saving ? "保存中..." : editing ? "更新する" : "記録する"}
+          </button>
+        </div>
       </div>
     </div>
   );
