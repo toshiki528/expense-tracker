@@ -136,6 +136,61 @@ export async function resyncSnapshot(snapshotId: string): Promise<MonthlySnapsho
   return updated as MonthlySnapshot;
 }
 
+/** Update income for one open snapshot and recalculate derived totals */
+export async function updateSnapshotIncome(snapshotId: string, monthlyIncome: number): Promise<MonthlySnapshot> {
+  const { data: existing, error: fetchError } = await supabase.from("monthly_snapshots").select("*").eq("id", snapshotId).single();
+  if (fetchError) throw fetchError;
+  if (!existing) throw new Error("Snapshot not found");
+
+  const snap = existing as MonthlySnapshot;
+  if (snap.status === "locked") throw new Error("Cannot update locked snapshot");
+
+  const detail = snap.snapshot_detail ?? {
+    fixed_costs: [],
+    personal_fixed_costs: [],
+    utility_bills: [],
+    savings: {
+      source: snap.savings_source || "manual",
+      amount: snap.savings_amount,
+      percent: null,
+    },
+  };
+  const savingsSource = snap.savings_source || detail.savings?.source || "manual";
+  const savingsPercent = detail.savings?.percent;
+  const savingsAmount = savingsSource === "manual" && typeof savingsPercent === "number"
+    ? Math.floor((monthlyIncome * savingsPercent) / 100)
+    : snap.savings_amount;
+  const availableAmount = monthlyIncome
+    - savingsAmount
+    - snap.shared_fixed_my_share
+    - snap.personal_fixed_total
+    - snap.utility_my_share;
+  const now = new Date().toISOString();
+
+  const { data: updated, error } = await supabase.from("monthly_snapshots")
+    .update({
+      monthly_income: monthlyIncome,
+      savings_amount: savingsAmount,
+      savings_source: savingsSource,
+      available_amount: availableAmount,
+      snapshot_detail: {
+        ...detail,
+        savings: {
+          ...(detail.savings || {}),
+          source: savingsSource,
+          amount: savingsAmount,
+          percent: savingsPercent,
+        },
+      },
+      updated_at: now,
+    })
+    .eq("id", snapshotId)
+    .select()
+    .single();
+  if (error) throw error;
+  return updated as MonthlySnapshot;
+}
+
 /** Lock a snapshot */
 export async function lockSnapshot(snapshotId: string): Promise<MonthlySnapshot> {
   const now = new Date().toISOString();

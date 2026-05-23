@@ -2,9 +2,9 @@
 
 import { useEffect, useState, useCallback, useRef } from "react";
 import { supabase } from "@/lib/supabase";
-import type { PersonalExpense, PersonalSettings, PersonalCategory, MonthlySnapshot, WarikanExpense } from "@/lib/supabase";
+import type { PersonalExpense, PersonalCategory, MonthlySnapshot, WarikanExpense } from "@/lib/supabase";
 import { getCurrentPeriod, getAdjacentPeriod, getRemainingDays } from "@/lib/salary-cycle";
-import { getOrCreateSnapshot, resyncSnapshot, lockSnapshot, unlockSnapshot, updateSalaryPayDate } from "@/lib/snapshot";
+import { getOrCreateSnapshot, resyncSnapshot, lockSnapshot, unlockSnapshot, updateSalaryPayDate, updateSnapshotIncome } from "@/lib/snapshot";
 import Link from "next/link";
 
 type AnyExpense = (PersonalExpense | WarikanExpense) & { source?: "warikan" };
@@ -18,7 +18,6 @@ const SYNC_ICON_MAP: Record<string, string> = {
 
 export default function HomePage() {
   const [period, setPeriod] = useState(getCurrentPeriod());
-  const [settings, setSettings] = useState<PersonalSettings | null>(null);
   const [expenses, setExpenses] = useState<PersonalExpense[]>([]);
   const [warikanExpenses, setWarikanExpenses] = useState<WarikanExpense[]>([]);
   const [categories, setCategories] = useState<PersonalCategory[]>([]);
@@ -45,8 +44,7 @@ export default function HomePage() {
     const snap = await getOrCreateSnapshot(period.year, period.month);
     setSnapshot(snap);
 
-    const [{ data: settingsData }, { data: expensesData }, { data: catData }] = await Promise.all([
-      supabase.from("personal_settings").select("*").limit(1).single(),
+    const [{ data: expensesData }, { data: catData }] = await Promise.all([
       supabase.from("personal_expenses").select("*")
         .gte("expense_date", snap.start_date).lte("expense_date", snap.end_date)
         .order("expense_date", { ascending: false }),
@@ -107,7 +105,6 @@ export default function HomePage() {
       }
     }
 
-    setSettings(settingsData as PersonalSettings | null);
     setExpenses(expensesData || []);
     setWarikanExpenses(wExpenses);
     setCategories(catData || []);
@@ -119,26 +116,23 @@ export default function HomePage() {
   const navigate = (dir: -1 | 1) => setPeriod(getAdjacentPeriod(period.year, period.month, dir));
 
   const startEditIncome = () => {
-    setIncomeInput(String(settings?.monthly_income || ""));
+    if (!snapshot || snapshot.status === "locked") return;
+    setIncomeInput(String(snapshot.monthly_income || ""));
     setEditingIncome(true);
     setTimeout(() => incomeRef.current?.focus(), 50);
   };
 
   const saveIncome = async () => {
+    if (!snapshot) return;
     const val = parseInt(incomeInput) || 0;
-    if (settings) {
-      await supabase.from("personal_settings").update({ monthly_income: val, updated_at: new Date().toISOString() }).eq("id", settings.id);
-      setSettings({ ...settings, monthly_income: val });
-    }
-    setEditingIncome(false);
-    // Resync snapshot if open
-    if (snapshot && snapshot.status === "open") {
-      const updated = await resyncSnapshot(snapshot.id);
+    if (snapshot.status === "open") {
+      const updated = await updateSnapshotIncome(snapshot.id, val);
       setSnapshot(updated);
-    } else if (snapshot && snapshot.status === "locked") {
-      setLockWarning("確定済みのため、スナップショットには反映されません");
+    } else {
+      setLockWarning("確定済みのため、収入は変更できません");
       setTimeout(() => setLockWarning(null), 3000);
     }
+    setEditingIncome(false);
   };
 
   const handleResync = async () => {
@@ -352,8 +346,13 @@ export default function HomePage() {
                 style={{ fontSize: "16px", borderBottom: "2px solid var(--accent)", color: "var(--ink)" }} />
             </div>
           ) : (
-            <button onClick={startEditIncome} className="font-amount font-semibold flex items-center gap-1.5" style={{ color: "var(--ink)" }}>
-              ¥{income.toLocaleString()} <span className="text-[10px]" style={{ color: "var(--warm-gray-400)" }}>✎</span>
+            <button
+              onClick={startEditIncome}
+              disabled={snapshot?.status === "locked"}
+              className="font-amount font-semibold flex items-center gap-1.5 disabled:cursor-not-allowed"
+              style={{ color: snapshot?.status === "locked" ? "var(--warm-gray-500)" : "var(--ink)" }}
+            >
+              ¥{income.toLocaleString()} {snapshot?.status === "open" && <span className="text-[10px]" style={{ color: "var(--warm-gray-400)" }}>✎</span>}
             </button>
           )}
         </div>
