@@ -410,6 +410,7 @@ export default function RecordPage() {
       {activeTab === "summary" && (
         <SummaryTab
           categorySummary={ledger.categorySummary}
+          periodLabel={ledger.context.label}
           monthlyTrend={ledger.monthlyTrend}
           totalSpent={ledger.totalSpent}
         />
@@ -602,10 +603,12 @@ function LedgerItemRow({ item, onEdit, onDelete }: { item: LedgerItem; onEdit: (
 function SummaryTab({
   categorySummary,
   monthlyTrend,
+  periodLabel,
   totalSpent,
 }: {
   categorySummary: LedgerDashboardData["categorySummary"];
   monthlyTrend: LedgerDashboardData["monthlyTrend"];
+  periodLabel: string;
   totalSpent: number;
 }) {
   return (
@@ -615,6 +618,13 @@ function SummaryTab({
         totalSpent={totalSpent}
         monthlyTrend={monthlyTrend}
         showTrend={false}
+      />
+
+      <AiCommentCard
+        categorySummary={categorySummary}
+        monthlyTrend={monthlyTrend}
+        periodLabel={periodLabel}
+        totalSpent={totalSpent}
       />
 
       <section className="card p-5">
@@ -644,6 +654,98 @@ function SummaryTab({
         )}
       </section>
     </div>
+  );
+}
+
+function AiCommentCard({
+  categorySummary,
+  monthlyTrend,
+  periodLabel,
+  totalSpent,
+}: {
+  categorySummary: LedgerDashboardData["categorySummary"];
+  monthlyTrend: LedgerDashboardData["monthlyTrend"];
+  periodLabel: string;
+  totalSpent: number;
+}) {
+  const [comment, setComment] = useState<string | null>(null);
+  const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    setComment(null);
+  }, [periodLabel]);
+
+  const fetchComment = async () => {
+    setLoading(true);
+    setComment(null);
+    try {
+      const res = await fetch("/api/ai-comment", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          period: periodLabel,
+          totalSpent,
+          catBreakdown: categorySummary.map((cat) => ({
+            name: cat.name,
+            icon: cat.icon,
+            spent: cat.spent,
+            prevSpent: cat.prevSpent,
+            budget: cat.budget,
+          })),
+          monthlyTrend,
+        }),
+      });
+      const data = await res.json();
+      setComment(data.comment || (res.ok ? "コメントを取得できませんでした。" : "エラーが発生しました。"));
+    } catch {
+      setComment("エラーが発生しました。もう一度お試しください。");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <section className="rounded-lg overflow-hidden" style={{ backgroundColor: "var(--cream)", border: "1px solid var(--cream-accent)" }}>
+      <div className="flex">
+        <div className="w-1 shrink-0" style={{ backgroundColor: "var(--accent)" }} />
+        <div className="flex-1 p-5">
+          <div className="flex items-center gap-2 mb-3">
+            <span className="text-2xl">🐥</span>
+            <div>
+              <h2 className="text-sm font-medium" style={{ color: "var(--ink)" }}>マネ吉のひとこと</h2>
+              <p className="text-[10px] font-light" style={{ color: "var(--warm-gray-500)" }}>AIファイナンシャルパートナー</p>
+            </div>
+          </div>
+
+          {comment ? (
+            <>
+              <div className="rounded p-3 text-sm leading-relaxed whitespace-pre-wrap" style={{ backgroundColor: "var(--bg-card)", color: "var(--ink-light)" }}>
+                {comment}
+              </div>
+              <button
+                type="button"
+                onClick={fetchComment}
+                disabled={loading}
+                className="mt-3 w-full py-2 rounded text-xs font-light transition-colors disabled:opacity-50"
+                style={{ backgroundColor: "var(--cream-accent)", color: "var(--ink-light)" }}
+              >
+                {loading ? "分析中..." : "もう一度聞く"}
+              </button>
+            </>
+          ) : (
+            <button
+              type="button"
+              onClick={fetchComment}
+              disabled={loading}
+              className="w-full py-3 rounded text-sm font-medium transition-all disabled:opacity-50"
+              style={{ backgroundColor: "var(--cream-accent)", color: "var(--ink-light)" }}
+            >
+              {loading ? "分析中..." : "マネ吉に聞いてみる"}
+            </button>
+          )}
+        </div>
+      </div>
+    </section>
   );
 }
 
