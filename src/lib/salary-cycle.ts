@@ -72,11 +72,29 @@ export function getRemainingDays(endDate: string): number {
   return Math.max(1, Math.ceil(diff / (1000 * 60 * 60 * 24)) + 1);
 }
 
+/** 給料日を算出（25日、土日なら前の金曜日） */
+export function getDefaultSalaryPayDate(year: number, month: number): string {
+  const d = new Date(year, month - 1, 25);
+  const dow = d.getDay();
+  if (dow === 6) d.setDate(24); // Sat → Fri
+  if (dow === 0) d.setDate(23); // Sun → Fri
+  return formatDate(d.getFullYear(), d.getMonth() + 1, d.getDate());
+}
+
+/** 翌月の給料日（end_date算出用） */
+export function getNextMonthSalaryPayDate(year: number, month: number): string {
+  let ny = year;
+  let nm = month + 1;
+  if (nm > 12) { nm = 1; ny += 1; }
+  return getDefaultSalaryPayDate(ny, nm);
+}
+
 /** 先月の月度を取得（光熱費参照用） */
-export function getPreviousPeriodMonth(): { year: number; month: number } {
-  const current = getCurrentPeriod();
-  let prevMonth = current.month - 1;
-  let prevYear = current.year;
+export function getPreviousPeriodMonth(periodYear?: number, periodMonth?: number): { year: number; month: number } {
+  const py = periodYear ?? getCurrentPeriod().year;
+  const pm = periodMonth ?? getCurrentPeriod().month;
+  let prevMonth = pm - 1;
+  let prevYear = py;
   if (prevMonth === 0) {
     prevMonth = 12;
     prevYear -= 1;

@@ -4,6 +4,7 @@ import { useEffect, useState, useCallback } from "react";
 import { supabase } from "@/lib/supabase";
 import type { PersonalExpense, PersonalCategory, WarikanExpense } from "@/lib/supabase";
 import { getCurrentPeriod, getAdjacentPeriod } from "@/lib/salary-cycle";
+import { getOrCreateSnapshot } from "@/lib/snapshot";
 import dynamic from "next/dynamic";
 
 const Charts = dynamic(() => import("@/components/AnalysisCharts"), { ssr: false });
@@ -98,11 +99,16 @@ export default function AnalysisPage() {
   const loadData = useCallback(async () => {
     setLoading(true);
 
+    // Use snapshot dates for current period
+    const snap = await getOrCreateSnapshot(period.year, period.month);
+    const currentStart = snap.start_date;
+    const currentEnd = snap.end_date;
+
     const prev = getAdjacentPeriod(period.year, period.month, -1);
 
     const [{ data: exp }, { data: prevExp }, { data: cats }] = await Promise.all([
       supabase.from("personal_expenses").select("*")
-        .gte("expense_date", period.start).lte("expense_date", period.end)
+        .gte("expense_date", currentStart).lte("expense_date", currentEnd)
         .order("expense_date", { ascending: false }),
       supabase.from("personal_expenses").select("*")
         .gte("expense_date", prev.start).lte("expense_date", prev.end),
@@ -110,7 +116,7 @@ export default function AnalysisPage() {
     ]);
 
     const [wExp, wPrevExp] = await Promise.all([
-      fetchWarikanForPeriod(period.start, period.end),
+      fetchWarikanForPeriod(currentStart, currentEnd),
       fetchWarikanForPeriod(prev.start, prev.end),
     ]);
 

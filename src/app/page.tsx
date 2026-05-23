@@ -2,8 +2,9 @@
 
 import { useEffect, useState, useCallback, useRef } from "react";
 import { supabase } from "@/lib/supabase";
-import type { PersonalExpense, PersonalSettings, PersonalCategory, WarikanExpense } from "@/lib/supabase";
-import { getCurrentPeriod, getAdjacentPeriod, getRemainingDays, getPreviousPeriodMonth } from "@/lib/salary-cycle";
+import type { PersonalExpense, PersonalSettings, PersonalCategory, MonthlySnapshot, WarikanExpense } from "@/lib/supabase";
+import { getCurrentPeriod, getAdjacentPeriod, getRemainingDays } from "@/lib/salary-cycle";
+import { getOrCreateSnapshot, resyncSnapshot, lockSnapshot, unlockSnapshot, updateSalaryPayDate } from "@/lib/snapshot";
 import Link from "next/link";
 
 type AnyExpense = (PersonalExpense | WarikanExpense) & { source?: "warikan" };
@@ -21,45 +22,41 @@ export default function HomePage() {
   const [expenses, setExpenses] = useState<PersonalExpense[]>([]);
   const [warikanExpenses, setWarikanExpenses] = useState<WarikanExpense[]>([]);
   const [categories, setCategories] = useState<PersonalCategory[]>([]);
-  const [fixedTotal, setFixedTotal] = useState(0);
-  const [personalFixedTotal, setPersonalFixedTotal] = useState(0);
-  const [utilityTotal, setUtilityTotal] = useState(0);
-  const [savingsAmount, setSavingsAmount] = useState(0);
+  const [snapshot, setSnapshot] = useState<MonthlySnapshot | null>(null);
   const [loading, setLoading] = useState(true);
   const [editingIncome, setEditingIncome] = useState(false);
   const [incomeInput, setIncomeInput] = useState("");
   const incomeRef = useRef<HTMLInputElement>(null);
 
+  // Salary date editing
+  const [editingSalaryDate, setEditingSalaryDate] = useState(false);
+  const [salaryDateInput, setSalaryDateInput] = useState("");
+
+  // Snapshot actions
+  const [syncingSnapshot, setSyncingSnapshot] = useState(false);
+  const [lockingSnapshot, setLockingSnapshot] = useState(false);
+  const [showLockConfirm, setShowLockConfirm] = useState(false);
+  const [lockWarning, setLockWarning] = useState<string | null>(null);
+
   const loadData = useCallback(async () => {
     setLoading(true);
 
-    const { data: settingsData } = await supabase.from("personal_settings").select("*").limit(1).single();
-    const { data: expensesData } = await supabase.from("personal_expenses").select("*")
-      .gte("expense_date", period.start).lte("expense_date", period.end)
-      .order("expense_date", { ascending: false });
-    const { data: catData } = await supabase.from("personal_categories").select("*")
-      .eq("is_active", true).order("sort_order");
-    const { data: fixedData } = await supabase.from("fixed_costs").select("amount").eq("is_active", true);
-    const { data: personalFixedData } = await supabase.from("personal_fixed_costs").select("amount").eq("is_active", true);
+    // Get or create snapshot first
+    const snap = await getOrCreateSnapshot(period.year, period.month);
+    setSnapshot(snap);
 
-    const prev = getPreviousPeriodMonth();
-    const prevPeriodStr = `${prev.year}-${String(prev.month).padStart(2, "0")}`;
-    const { data: utilityData } = await supabase.from("utility_bills").select("amount").eq("period", prevPeriodStr);
+    const [{ data: settingsData }, { data: expensesData }, { data: catData }] = await Promise.all([
+      supabase.from("personal_settings").select("*").limit(1).single(),
+      supabase.from("personal_expenses").select("*")
+        .gte("expense_date", snap.start_date).lte("expense_date", snap.end_date)
+        .order("expense_date", { ascending: false }),
+      supabase.from("personal_categories").select("*")
+        .eq("is_active", true).order("sort_order"),
+    ]);
 
-    // Load savings
-    const s = settingsData as PersonalSettings | null;
-    let savings = 0;
-    if (s?.savings_source === "kakeibo") {
-      const { data: savingsData } = await supabase.from("monthly_savings").select("amount")
-        .eq("year", period.year).eq("month", period.month).eq("person", "俊樹").single();
-      savings = savingsData?.amount || 0;
-    } else if (s) {
-      savings = s.savings_percent ? Math.floor(s.monthly_income * s.savings_percent / 100) : (s.savings_amount || 0);
-    }
-
-    // Load warikan receipts for this period
+    // Load warikan receipts using snapshot dates
     const { data: receipts } = await supabase.from("receipts").select("*")
-      .gte("date", period.start).lte("date", period.end);
+      .gte("date", snap.start_date).lte("date", snap.end_date);
 
     const wExpenses: WarikanExpense[] = [];
     if (receipts) {
@@ -110,14 +107,10 @@ export default function HomePage() {
       }
     }
 
-    setSettings(s);
+    setSettings(settingsData as PersonalSettings | null);
     setExpenses(expensesData || []);
     setWarikanExpenses(wExpenses);
     setCategories(catData || []);
-    setFixedTotal(fixedData ? fixedData.reduce((sum, c) => sum + c.amount, 0) : 0);
-    setPersonalFixedTotal(personalFixedData ? personalFixedData.reduce((sum, c) => sum + c.amount, 0) : 0);
-    setUtilityTotal(utilityData ? utilityData.reduce((sum, u) => sum + u.amount, 0) : 0);
-    setSavingsAmount(savings);
     setLoading(false);
   }, [period]);
 
@@ -138,23 +131,95 @@ export default function HomePage() {
       setSettings({ ...settings, monthly_income: val });
     }
     setEditingIncome(false);
+    // Resync snapshot if open
+    if (snapshot && snapshot.status === "open") {
+      const updated = await resyncSnapshot(snapshot.id);
+      setSnapshot(updated);
+    } else if (snapshot && snapshot.status === "locked") {
+      setLockWarning("確定済みのため、スナップショットには反映されません");
+      setTimeout(() => setLockWarning(null), 3000);
+    }
   };
 
-  const income = settings?.monthly_income || 0;
-  const fixedMyShare = Math.floor(fixedTotal / 2);
-  const utilityMyShare = Math.floor(utilityTotal / 2);
-  const available = income - savingsAmount - fixedMyShare - personalFixedTotal - utilityMyShare;
+  const handleResync = async () => {
+    if (!snapshot || snapshot.status === "locked") return;
+    setSyncingSnapshot(true);
+    try {
+      const updated = await resyncSnapshot(snapshot.id);
+      setSnapshot(updated);
+      await loadData();
+    } finally {
+      setSyncingSnapshot(false);
+    }
+  };
+
+  const handleLock = async () => {
+    if (!snapshot) return;
+    setLockingSnapshot(true);
+    try {
+      const updated = await lockSnapshot(snapshot.id);
+      setSnapshot(updated);
+    } finally {
+      setLockingSnapshot(false);
+      setShowLockConfirm(false);
+    }
+  };
+
+  const handleUnlock = async () => {
+    if (!snapshot) return;
+    const updated = await unlockSnapshot(snapshot.id);
+    setSnapshot(updated);
+  };
+
+  const startEditSalaryDate = () => {
+    if (!snapshot || snapshot.status === "locked") return;
+    setSalaryDateInput(snapshot.salary_pay_date);
+    setEditingSalaryDate(true);
+  };
+
+  const saveSalaryDate = async () => {
+    if (!snapshot || !salaryDateInput) return;
+    const result = await updateSalaryPayDate(snapshot.id, salaryDateInput);
+    setSnapshot(result.snapshot);
+    setEditingSalaryDate(false);
+    if (result.prevLockedWarning) {
+      setLockWarning("前月が確定済みのため、前月の終了日は変更されませんでした");
+      setTimeout(() => setLockWarning(null), 4000);
+    }
+    await loadData();
+  };
+
+  // Derive values from snapshot
+  const income = snapshot?.monthly_income || 0;
+  const savingsAmount = snapshot?.savings_amount || 0;
+  const sharedFixedMyShare = snapshot?.shared_fixed_my_share || 0;
+  const personalFixedTotal = snapshot?.personal_fixed_total || 0;
+  const utilityMyShare = snapshot?.utility_my_share || 0;
+  const available = snapshot?.available_amount || 0;
 
   const manualSpent = expenses.reduce((sum, e) => sum + e.amount, 0);
   const warikanSpent = warikanExpenses.reduce((sum, e) => sum + e.amount, 0);
   const totalSpent = manualSpent + warikanSpent;
 
   const remaining = available - totalSpent;
-  const remainingDays = getRemainingDays(period.end);
+  const endDate = snapshot?.end_date || period.end;
+  const remainingDays = getRemainingDays(endDate);
   const dailyBudget = remainingDays > 0 ? Math.floor(remaining / remainingDays) : 0;
   const usagePercent = available > 0 ? Math.round((totalSpent / available) * 100) : 0;
 
-  const prevMonth = getPreviousPeriodMonth();
+  // Period label from snapshot dates
+  const periodLabel = snapshot
+    ? (() => {
+        const s = new Date(snapshot.start_date + "T00:00:00");
+        const e = new Date(snapshot.end_date + "T00:00:00");
+        return `${period.month}月度（${s.getMonth() + 1}/${s.getDate()}〜${e.getMonth() + 1}/${e.getDate()}）`;
+      })()
+    : period.label;
+
+  // Utility period from snapshot
+  const utilityPeriodLabel = snapshot?.utility_period
+    ? parseInt(snapshot.utility_period.split("-")[1]) + "月度分"
+    : "";
 
   // All expenses merged for display
   const allExpenses: AnyExpense[] = [
@@ -184,9 +249,92 @@ export default function HomePage() {
       {/* Period Selector */}
       <div className="flex items-center justify-between px-2">
         <button onClick={() => navigate(-1)} className="text-xl px-3 py-1" style={{ color: "var(--warm-gray-400)" }}>‹</button>
-        <h1 className="text-sm font-medium tracking-wide" style={{ color: "var(--ink)" }}>{period.label}</h1>
+        <h1 className="text-sm font-medium tracking-wide" style={{ color: "var(--ink)" }}>{periodLabel}</h1>
         <button onClick={() => navigate(1)} className="text-xl px-3 py-1" style={{ color: "var(--warm-gray-400)" }}>›</button>
       </div>
+
+      {/* Salary Pay Date & Snapshot Status */}
+      {snapshot && (
+        <div className="card p-4 space-y-3">
+          {/* Salary pay date */}
+          <div className="flex items-center justify-between">
+            <span className="text-xs font-light" style={{ color: "var(--warm-gray-500)" }}>給料日</span>
+            {editingSalaryDate ? (
+              <div className="flex items-center gap-2">
+                <input type="date" value={salaryDateInput} onChange={(e) => setSalaryDateInput(e.target.value)}
+                  className="text-xs rounded px-2 py-1 outline-none"
+                  style={{ fontSize: "14px", border: "1px solid var(--border)", color: "var(--ink)" }} />
+                <button onClick={saveSalaryDate} className="text-xs px-2 py-1 rounded"
+                  style={{ backgroundColor: "var(--accent)", color: "#FFFFFF" }}>保存</button>
+                <button onClick={() => setEditingSalaryDate(false)} className="text-xs px-2 py-1"
+                  style={{ color: "var(--warm-gray-400)" }}>取消</button>
+              </div>
+            ) : (
+              <div className="flex items-center gap-2">
+                <span className="text-xs font-amount" style={{ color: "var(--ink)" }}>{snapshot.salary_pay_date}</span>
+                {snapshot.is_salary_pay_date_manual && (
+                  <span className="text-[9px] px-1 rounded" style={{ backgroundColor: "var(--accent-light)", color: "var(--accent-dark)" }}>手動</span>
+                )}
+                {snapshot.status === "open" && (
+                  <button onClick={startEditSalaryDate} className="text-[10px]" style={{ color: "var(--accent)" }}>変更</button>
+                )}
+              </div>
+            )}
+          </div>
+
+          <div style={{ borderTop: "1px dashed var(--border)", margin: "4px 0" }} />
+
+          {/* Snapshot status */}
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <span className="text-xs font-light" style={{ color: "var(--warm-gray-500)" }}>ステータス</span>
+              <span className="text-[10px] px-1.5 py-0.5 rounded-full font-medium"
+                style={{
+                  backgroundColor: snapshot.status === "locked" ? "var(--warm-gray-100)" : "var(--accent-light)",
+                  color: snapshot.status === "locked" ? "var(--warm-gray-600)" : "var(--accent-dark)",
+                }}>
+                {snapshot.status === "locked" ? "確定済み" : "未確定"}
+              </span>
+            </div>
+            {snapshot.status === "open" ? (
+              <div className="flex items-center gap-2">
+                <button onClick={handleResync} disabled={syncingSnapshot}
+                  className="text-[10px] px-2 py-1 rounded transition-colors disabled:opacity-50"
+                  style={{ backgroundColor: "var(--warm-gray-50)", color: "var(--accent)", border: "1px solid var(--border)" }}>
+                  {syncingSnapshot ? "同期中..." : "再同期"}
+                </button>
+                <button onClick={() => setShowLockConfirm(true)}
+                  className="text-[10px] px-2 py-1 rounded transition-colors"
+                  style={{ backgroundColor: "var(--accent)", color: "#FFFFFF" }}>
+                  確定する
+                </button>
+              </div>
+            ) : (
+              <div className="flex items-center gap-2">
+                <span className="text-[10px]" style={{ color: "var(--warm-gray-400)" }}>確定済みのため再同期不可</span>
+                <button onClick={handleUnlock}
+                  className="text-[10px] px-2 py-1 rounded transition-colors"
+                  style={{ backgroundColor: "var(--warm-gray-50)", color: "var(--warm-gray-600)", border: "1px solid var(--border)" }}>
+                  ロック解除
+                </button>
+              </div>
+            )}
+          </div>
+
+          {/* Sync/lock timestamps */}
+          <div className="text-[9px] text-right" style={{ color: "var(--warm-gray-300)" }}>
+            {snapshot.synced_at && <>同期: {new Date(snapshot.synced_at).toLocaleString("ja-JP")}</>}
+            {snapshot.locked_at && <> / 確定: {new Date(snapshot.locked_at).toLocaleString("ja-JP")}</>}
+          </div>
+        </div>
+      )}
+
+      {/* Lock warning toast */}
+      {lockWarning && (
+        <div className="text-xs text-center py-2 px-3 rounded" style={{ backgroundColor: "var(--warning-light, var(--error-light))", color: "var(--warning, var(--error))" }}>
+          {lockWarning}
+        </div>
+      )}
 
       {/* Money Flow Card */}
       <div className="card p-6 space-y-3">
@@ -216,13 +364,13 @@ export default function HomePage() {
           <span className="text-sm font-light" style={{ color: "var(--warm-gray-500)" }}>- 先取り貯蓄</span>
           <span className="font-amount text-sm" style={{ color: "var(--warm-gray-500)" }}>-¥{savingsAmount.toLocaleString()}</span>
         </div>
-        {settings?.savings_source === "kakeibo" && (
+        {snapshot?.savings_source === "kakeibo" && (
           <p className="text-[10px] text-right" style={{ color: "var(--accent)" }}>家計簿から取得</p>
         )}
 
         <div className="flex justify-between items-center">
           <span className="text-sm font-light" style={{ color: "var(--warm-gray-500)" }}>- 共通固定費（俊樹負担）</span>
-          <span className="font-amount text-sm" style={{ color: "var(--warm-gray-500)" }}>-¥{fixedMyShare.toLocaleString()}</span>
+          <span className="font-amount text-sm" style={{ color: "var(--warm-gray-500)" }}>-¥{sharedFixedMyShare.toLocaleString()}</span>
         </div>
         <p className="text-[10px] text-right" style={{ color: "var(--accent)" }}>ワリカンから取得</p>
 
@@ -235,7 +383,7 @@ export default function HomePage() {
           <span className="text-sm font-light" style={{ color: "var(--warm-gray-500)" }}>- 光熱費（俊樹負担）</span>
           <span className="font-amount text-sm" style={{ color: "var(--warm-gray-500)" }}>-¥{utilityMyShare.toLocaleString()}</span>
         </div>
-        <p className="text-[10px] text-right" style={{ color: "var(--accent)" }}>ワリカンから取得（{prevMonth.month}月度分）</p>
+        <p className="text-[10px] text-right" style={{ color: "var(--accent)" }}>ワリカンから取得（{utilityPeriodLabel}）</p>
 
         <div style={{ borderTop: "1.5px solid var(--accent-muted)", margin: "10px 0" }} />
         <div className="flex justify-between items-baseline">
@@ -334,6 +482,28 @@ export default function HomePage() {
           </div>
         )}
       </div>
+
+      {/* Lock Confirmation Modal */}
+      {showLockConfirm && (
+        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50" onClick={() => setShowLockConfirm(false)}>
+          <div className="bg-white rounded-lg w-80 p-6 space-y-4" style={{ border: "1px solid var(--border)" }} onClick={(e) => e.stopPropagation()}>
+            <h3 className="text-sm font-medium text-center" style={{ color: "var(--ink)" }}>この月を確定しますか？</h3>
+            <p className="text-xs text-center" style={{ color: "var(--warm-gray-500)" }}>確定後は再同期できなくなります。ロック解除で元に戻せます。</p>
+            <div className="flex gap-3">
+              <button onClick={() => setShowLockConfirm(false)}
+                className="flex-1 py-2.5 rounded text-sm font-medium"
+                style={{ backgroundColor: "var(--warm-gray-100)", color: "var(--ink-light)" }}>
+                キャンセル
+              </button>
+              <button onClick={handleLock} disabled={lockingSnapshot}
+                className="flex-1 py-2.5 rounded text-sm font-medium disabled:opacity-50"
+                style={{ backgroundColor: "var(--accent)", color: "#FFFFFF" }}>
+                {lockingSnapshot ? "処理中..." : "確定する"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

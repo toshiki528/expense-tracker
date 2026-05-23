@@ -97,6 +97,40 @@ export type MonthlySavings = {
   amount: number;
 };
 
+// --- Monthly snapshot types ---
+
+export type SnapshotDetail = {
+  fixed_costs: { name: string; amount: number }[];
+  personal_fixed_costs: { name: string; amount: number }[];
+  utility_bills: { type: string; amount: number; payer: string }[];
+  savings: { source: string; amount: number; percent?: number | null };
+};
+
+export type MonthlySnapshot = {
+  id: string;
+  period: string;
+  salary_pay_date: string;
+  start_date: string;
+  end_date: string;
+  is_salary_pay_date_manual: boolean;
+  monthly_income: number;
+  savings_amount: number;
+  savings_source: string | null;
+  shared_fixed_total: number;
+  shared_fixed_my_share: number;
+  personal_fixed_total: number;
+  utility_period: string | null;
+  utility_total: number;
+  utility_my_share: number;
+  available_amount: number;
+  snapshot_detail: SnapshotDetail;
+  status: "open" | "locked";
+  synced_at: string | null;
+  locked_at: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
 // --- Warikan sync virtual expense type ---
 
 export type WarikanExpense = {
