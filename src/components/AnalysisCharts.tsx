@@ -10,10 +10,14 @@ export default function AnalysisCharts({
   catBreakdown,
   totalSpent,
   monthlyTrend,
+  showPie = true,
+  showTrend = true,
 }: {
   catBreakdown: CatBreakdown[];
   totalSpent: number;
   monthlyTrend: { month: string; total: number }[];
+  showPie?: boolean;
+  showTrend?: boolean;
 }) {
   const pieData = catBreakdown
     .filter((c) => c.spent > 0)
@@ -21,7 +25,7 @@ export default function AnalysisCharts({
 
   return (
     <>
-      {pieData.length > 0 && (
+      {showPie && pieData.length > 0 && (
         <div className="card p-5">
           <h2 className="text-xs font-light tracking-wide mb-3" style={{ color: "var(--warm-gray-500)" }}>カテゴリ別</h2>
           <div className="flex items-center">
@@ -65,7 +69,7 @@ export default function AnalysisCharts({
         </div>
       )}
 
-      {monthlyTrend.some((m) => m.total > 0) && (
+      {showTrend && monthlyTrend.some((m) => m.total > 0) && (
         <div className="card p-5">
           <h2 className="text-xs font-light tracking-wide mb-3" style={{ color: "var(--warm-gray-500)" }}>月間推移（6ヶ月）</h2>
           <div className="h-40">

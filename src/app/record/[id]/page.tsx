@@ -1,9 +1,10 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
-import type { PersonalCategory } from "@/lib/supabase";
+import type { MonthlySnapshot, PersonalCategory, PersonalExpense } from "@/lib/supabase";
+import { sortManualCategories } from "@/lib/ledger";
 
 const PAYMENT_METHODS = [
   { key: "cash", label: "現金等", icon: "💴" },
@@ -15,35 +16,46 @@ export default function EditExpensePage() {
   const router = useRouter();
   const [amount, setAmount] = useState("");
   const [category, setCategory] = useState("");
-  const [paymentMethod, setPaymentMethod] = useState("e-pay");
+  const [paymentMethod, setPaymentMethod] = useState("cash");
   const [date, setDate] = useState("");
   const [memo, setMemo] = useState("");
   const [categories, setCategories] = useState<PersonalCategory[]>([]);
   const [saving, setSaving] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [locked, setLocked] = useState(false);
 
-  useEffect(() => {
-    loadData();
-  }, [id]);
-
-  async function loadData() {
+  const loadData = useCallback(async () => {
     const [{ data: expense }, { data: cats }] = await Promise.all([
       supabase.from("personal_expenses").select("*").eq("id", id).single(),
       supabase.from("personal_categories").select("*").eq("is_active", true).order("sort_order"),
     ]);
     if (expense) {
-      setAmount(String(expense.amount));
-      setCategory(expense.category);
-      setPaymentMethod(expense.payment_method);
-      setDate(expense.expense_date);
-      setMemo(expense.memo || "");
+      const exp = expense as PersonalExpense;
+      setAmount(String(exp.amount));
+      setCategory(exp.category);
+      setPaymentMethod(exp.payment_method);
+      setDate(exp.expense_date);
+      setMemo(exp.memo || "");
+      const { data: snap } = await supabase.from("monthly_snapshots")
+        .select("*")
+        .lte("start_date", exp.expense_date)
+        .gte("end_date", exp.expense_date)
+        .order("period", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      setLocked((snap as MonthlySnapshot | null)?.status === "locked");
     }
-    setCategories(cats || []);
+    setCategories(sortManualCategories(cats || []));
     setLoading(false);
-  }
+  }, [id]);
+
+  useEffect(() => {
+    loadData();
+  }, [loadData]);
 
   const handleSave = async () => {
+    if (locked) return;
     const amountNum = parseInt(amount);
     if (!amountNum || !category) return;
     setSaving(true);
@@ -56,12 +68,13 @@ export default function EditExpensePage() {
       updated_at: new Date().toISOString(),
     }).eq("id", id);
     setSaving(false);
-    router.push("/");
+    router.push(`/record?date=${date}`);
   };
 
   const handleDelete = async () => {
+    if (locked) return;
     await supabase.from("personal_expenses").delete().eq("id", id);
-    router.push("/");
+    router.push(`/record?date=${date}`);
   };
 
   if (loading) {
@@ -79,6 +92,12 @@ export default function EditExpensePage() {
         <button onClick={() => router.back()} className="text-sm font-light" style={{ color: "var(--warm-gray-400)" }}>戻る</button>
       </div>
 
+      {locked && (
+        <div className="text-xs rounded px-3 py-2 text-center" style={{ backgroundColor: "var(--warm-gray-100)", color: "var(--warm-gray-600)" }}>
+          確定済み月のため編集できません
+        </div>
+      )}
+
       {/* Amount */}
       <div className="card p-5">
         <label className="text-xs font-light tracking-wide block mb-2" style={{ color: "var(--warm-gray-400)" }}>金額</label>
@@ -89,6 +108,7 @@ export default function EditExpensePage() {
             inputMode="numeric"
             value={amount}
             onChange={(e) => setAmount(e.target.value)}
+            disabled={locked}
             className="flex-1 font-amount font-extrabold bg-transparent outline-none"
             style={{ fontSize: "36px", color: "var(--ink)" }}
           />
@@ -98,12 +118,13 @@ export default function EditExpensePage() {
       {/* Category */}
       <div className="card p-5">
         <label className="text-xs font-light tracking-wide block mb-3" style={{ color: "var(--warm-gray-400)" }}>カテゴリ</label>
-        <div className="grid grid-cols-3 gap-2">
-          {categories.map((cat) => (
-            <button
-              key={cat.id}
-              onClick={() => setCategory(cat.name)}
-              className="py-3 rounded text-sm font-medium transition-all relative"
+              <div className="flex gap-2 overflow-x-auto pb-1">
+                {categories.map((cat) => (
+                  <button
+                    key={cat.id}
+                    onClick={() => setCategory(cat.name)}
+                    disabled={locked}
+                    className="shrink-0 min-w-[112px] py-3 px-3 rounded text-sm font-medium transition-all relative"
               style={{
                 backgroundColor: category === cat.name ? "var(--accent-light)" : "var(--warm-gray-50)",
                 color: category === cat.name ? "var(--accent-dark)" : "var(--warm-gray-600)",
@@ -128,6 +149,7 @@ export default function EditExpensePage() {
             <button
               key={pm.key}
               onClick={() => setPaymentMethod(pm.key)}
+              disabled={locked}
               className="py-3 rounded text-sm font-medium transition-all"
               style={{
                 backgroundColor: paymentMethod === pm.key ? "var(--accent-light)" : "var(--warm-gray-50)",
@@ -146,13 +168,13 @@ export default function EditExpensePage() {
       <div className="card p-5 space-y-4">
         <div>
           <label className="text-xs font-light tracking-wide block mb-1.5" style={{ color: "var(--warm-gray-400)" }}>日付</label>
-          <input type="date" value={date} onChange={(e) => setDate(e.target.value)}
+          <input type="date" value={date} onChange={(e) => setDate(e.target.value)} disabled={locked}
             className="w-full text-sm rounded px-3 py-2.5 outline-none"
             style={{ fontSize: "16px", border: "1px solid var(--border)", color: "var(--ink)" }} />
         </div>
         <div>
           <label className="text-xs font-light tracking-wide block mb-1.5" style={{ color: "var(--warm-gray-400)" }}>メモ</label>
-          <input type="text" value={memo} onChange={(e) => setMemo(e.target.value)}
+          <input type="text" value={memo} onChange={(e) => setMemo(e.target.value)} disabled={locked}
             placeholder="メモ（任意）"
             className="w-full text-sm rounded px-3 py-2.5 outline-none"
             style={{ fontSize: "16px", border: "1px solid var(--border)", color: "var(--ink)" }} />
@@ -162,7 +184,7 @@ export default function EditExpensePage() {
       {/* Actions */}
       <button
         onClick={handleSave}
-        disabled={saving || !amount || !category}
+        disabled={saving || locked || !amount || !category}
         className="w-full py-4 text-base font-bold disabled:opacity-40 transition-all active:scale-[0.98]"
         style={{ borderRadius: "4px", backgroundColor: "var(--accent)", color: "#FFFFFF" }}
       >
@@ -171,7 +193,8 @@ export default function EditExpensePage() {
 
       <button
         onClick={() => setDeleteTarget(true)}
-        className="w-full py-3 text-sm font-medium rounded"
+        disabled={locked}
+        className="w-full py-3 text-sm font-medium rounded disabled:opacity-40"
         style={{ backgroundColor: "var(--error-light)", color: "var(--error)" }}
       >
         この記録を削除
