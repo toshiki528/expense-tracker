@@ -15,7 +15,8 @@ import {
 
 const Charts = dynamic(() => import("@/components/AnalysisCharts"), { ssr: false });
 
-type RecordTab = "daily" | "summary" | "trend";
+type RecordTab = "input" | "history" | "summary" | "trend";
+type CalcOperator = "+" | "-" | "*" | "/";
 
 const PAYMENT_METHODS: { key: PaymentMethod; label: string; icon: string }[] = [
   { key: "cash", label: "現金等", icon: "💴" },
@@ -27,8 +28,10 @@ const PAYMENT_LABELS: Record<string, string> = {
   credit: "💳クレカ",
 };
 
-function isRecordTab(value: string | null): value is RecordTab {
-  return value === "daily" || value === "summary" || value === "trend";
+function parseRecordTab(value: string | null): RecordTab {
+  if (value === "history" || value === "daily") return "history";
+  if (value === "summary" || value === "trend") return value;
+  return "input";
 }
 
 function todayString() {
@@ -45,12 +48,11 @@ function dateInRange(date: string, start: string, end: string) {
 
 export default function RecordPage() {
   const [period, setPeriod] = useState(getCurrentPeriod());
-  const [activeTab, setActiveTab] = useState<RecordTab>("daily");
+  const [activeTab, setActiveTab] = useState<RecordTab>("input");
   const [ledger, setLedger] = useState<LedgerDashboardData | null>(null);
   const [loading, setLoading] = useState(true);
   const [selectedDate, setSelectedDate] = useState("");
   const selectedDateRef = useRef("");
-  const pendingOpenInputRef = useRef(false);
   const autoScrolledPeriodRef = useRef("");
   const [expandedDates, setExpandedDates] = useState<string[]>([]);
   const [expandedCategories, setExpandedCategories] = useState<string[]>([]);
@@ -68,7 +70,7 @@ export default function RecordPage() {
   const [display, setDisplay] = useState("0");
   const [expression, setExpression] = useState<string | null>(null);
   const pendingRef = useRef<number | null>(null);
-  const opRef = useRef<string | null>(null);
+  const opRef = useRef<CalcOperator | null>(null);
   const freshRef = useRef(false);
 
   const amount = display === "0" ? "" : display;
@@ -106,20 +108,20 @@ export default function RecordPage() {
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
-    const tab = params.get("tab");
-    if (isRecordTab(tab)) setActiveTab(tab);
+    setActiveTab(parseRecordTab(params.get("tab")));
   }, []);
 
   useEffect(() => { loadData(); }, [loadData]);
 
-  const changeTab = (tab: RecordTab) => {
+  const changeTab = useCallback((tab: RecordTab) => {
     setActiveTab(tab);
     const params = new URLSearchParams(window.location.search);
-    if (tab === "daily") params.delete("tab");
+    params.delete("input");
+    if (tab === "input") params.delete("tab");
     else params.set("tab", tab);
     const query = params.toString();
     window.history.replaceState(null, "", query ? `/record?${query}` : "/record");
-  };
+  }, []);
 
   const navigate = (dir: -1 | 1) => {
     setPeriod(getAdjacentPeriod(period.year, period.month, dir));
@@ -143,39 +145,69 @@ export default function RecordPage() {
     freshRef.current = true;
   };
 
+  const setAmountFromInput = (value: string) => {
+    const digits = value.replace(/[^\d]/g, "").slice(0, 8);
+    setDisplay(digits || "0");
+    setExpression(null);
+    pendingRef.current = null;
+    opRef.current = null;
+    freshRef.current = false;
+  };
+
+  const operatorLabel = (operator: CalcOperator) => {
+    if (operator === "*") return "×";
+    if (operator === "/") return "÷";
+    if (operator === "-") return "−";
+    return "+";
+  };
+
+  const calculate = (left: number, right: number, operator: CalcOperator) => {
+    if (operator === "+") return left + right;
+    if (operator === "-") return left - right;
+    if (operator === "*") return left * right;
+    if (right === 0) {
+      showToast("0で割ることはできません");
+      return left;
+    }
+    return Math.floor(left / right);
+  };
+
   const calcPress = (key: string) => {
     if (key === "C") {
       resetCalc();
       return;
     }
     if (key === "back") {
-      if (freshRef.current) return;
+      if (freshRef.current) {
+        setDisplay("0");
+        freshRef.current = false;
+        return;
+      }
       setDisplay((d) => (d.length <= 1 ? "0" : d.slice(0, -1)));
       return;
     }
-    if (key === "+" || key === "-") {
+    if (key === "+" || key === "-" || key === "*" || key === "/") {
+      const nextOperator = key as CalcOperator;
       const current = parseInt(display) || 0;
       if (pendingRef.current !== null && opRef.current && !freshRef.current) {
-        const result = opRef.current === "+" ? pendingRef.current + current : pendingRef.current - current;
+        const result = calculate(pendingRef.current, current, opRef.current);
         pendingRef.current = Math.max(0, result);
-        opRef.current = key;
+        opRef.current = nextOperator;
         freshRef.current = true;
-        const sym = key === "+" ? "+" : "−";
-        setExpression(`${pendingRef.current.toLocaleString()} ${sym}`);
+        setExpression(`${pendingRef.current.toLocaleString()} ${operatorLabel(nextOperator)}`);
         setDisplay(String(pendingRef.current));
       } else {
         pendingRef.current = current;
-        opRef.current = key;
+        opRef.current = nextOperator;
         freshRef.current = true;
-        const sym = key === "+" ? "+" : "−";
-        setExpression(`${current.toLocaleString()} ${sym}`);
+        setExpression(`${current.toLocaleString()} ${operatorLabel(nextOperator)}`);
       }
       return;
     }
     if (key === "=") {
       if (pendingRef.current !== null && opRef.current) {
         const current = parseInt(display) || 0;
-        const result = opRef.current === "+" ? pendingRef.current + current : pendingRef.current - current;
+        const result = calculate(pendingRef.current, current, opRef.current);
         pendingRef.current = null;
         opRef.current = null;
         freshRef.current = true;
@@ -189,8 +221,7 @@ export default function RecordPage() {
       freshRef.current = false;
       const digit = key === "00" ? "0" : key;
       if (pendingRef.current !== null && opRef.current) {
-        const sym = opRef.current === "+" ? "+" : "−";
-        setExpression(`${pendingRef.current.toLocaleString()} ${sym} ${digit}`);
+        setExpression(`${pendingRef.current.toLocaleString()} ${operatorLabel(opRef.current)} ${digit}`);
       }
       setDisplay(digit);
     } else {
@@ -198,16 +229,14 @@ export default function RecordPage() {
         if (d === "0") {
           const v = key === "00" ? "0" : key;
           if (pendingRef.current !== null && opRef.current) {
-            const sym = opRef.current === "+" ? "+" : "−";
-            setExpression(`${pendingRef.current.toLocaleString()} ${sym} ${v}`);
+            setExpression(`${pendingRef.current.toLocaleString()} ${operatorLabel(opRef.current)} ${v}`);
           }
           return v;
         }
         if (d.length >= 8) return d;
         const v = d + key;
         if (pendingRef.current !== null && opRef.current) {
-          const sym = opRef.current === "+" ? "+" : "−";
-          setExpression(`${pendingRef.current.toLocaleString()} ${sym} ${parseInt(v).toLocaleString()}`);
+          setExpression(`${pendingRef.current.toLocaleString()} ${operatorLabel(opRef.current)} ${parseInt(v).toLocaleString()}`);
         }
         return v;
       });
@@ -223,10 +252,7 @@ export default function RecordPage() {
   }, [ledger, selectedDate]);
 
   const openEntrySheet = useCallback((entryDate?: string, item?: LedgerItem) => {
-    if (!ledger) {
-      pendingOpenInputRef.current = true;
-      return;
-    }
+    if (!ledger) return;
     if (ledger.context.isLocked) {
       showToast("確定済み月のため編集できません");
       return;
@@ -253,39 +279,34 @@ export default function RecordPage() {
   }, [category, getDefaultEntryDate, ledger]);
 
   useEffect(() => {
-    if (!ledger) return;
-    const openRequestedInput = () => {
-      pendingOpenInputRef.current = false;
-      openEntrySheet();
-    };
-
     const params = new URLSearchParams(window.location.search);
     if (params.get("input") === "1") {
-      openRequestedInput();
+      setActiveTab("input");
       params.delete("input");
       const query = params.toString();
       window.history.replaceState(null, "", query ? `/record?${query}` : "/record");
-      return;
     }
-
-    if (pendingOpenInputRef.current) openRequestedInput();
-  }, [ledger, openEntrySheet]);
+  }, []);
 
   useEffect(() => {
-    const handleOpenRecordEntry = () => {
-      if (!ledger) {
-        pendingOpenInputRef.current = true;
-        return;
-      }
-      openEntrySheet();
-    };
+    const handleShowRecordInput = () => changeTab("input");
 
-    window.addEventListener("open-record-entry", handleOpenRecordEntry);
-    return () => window.removeEventListener("open-record-entry", handleOpenRecordEntry);
-  }, [ledger, openEntrySheet]);
+    window.addEventListener("show-record-input", handleShowRecordInput);
+    return () => window.removeEventListener("show-record-input", handleShowRecordInput);
+  }, [changeTab]);
 
   useEffect(() => {
-    if (!ledger || activeTab !== "daily" || entryOpen || !selectedDate) return;
+    if (!ledger || editingItem) return;
+    if (!category && ledger.manualCategories[0]) {
+      setCategory(ledger.manualCategories[0].name);
+    }
+    if (!dateInRange(date, ledger.context.startDate, ledger.context.endDate)) {
+      setDate(getDefaultEntryDate());
+    }
+  }, [category, date, editingItem, getDefaultEntryDate, ledger]);
+
+  useEffect(() => {
+    if (!ledger || activeTab !== "history" || entryOpen || !selectedDate) return;
     const scrollKey = `${ledger.context.period}:${selectedDate}`;
     if (autoScrolledPeriodRef.current === scrollKey) return;
     autoScrolledPeriodRef.current = scrollKey;
@@ -383,6 +404,15 @@ export default function RecordPage() {
     });
   }, [filter, ledger]);
 
+  const historyGroups = useMemo(() => {
+    if (!ledger) return [];
+    const today = todayString();
+    if (dateInRange(today, ledger.context.startDate, ledger.context.endDate)) {
+      return ledger.dailyGroups.filter((day) => day.date <= today);
+    }
+    return ledger.dailyGroups;
+  }, [ledger]);
+
   if (loading || !ledger) {
     return (
       <div className="flex items-center justify-center h-64">
@@ -425,9 +455,10 @@ export default function RecordPage() {
         </div>
       </section>
 
-      <div className="grid grid-cols-3 gap-1 rounded p-1" style={{ backgroundColor: "var(--warm-gray-50)" }}>
+      <div className="grid grid-cols-4 gap-1 rounded p-1" style={{ backgroundColor: "var(--warm-gray-50)" }}>
         {([
-          ["daily", "日別"],
+          ["input", "入力"],
+          ["history", "履歴"],
           ["summary", "集計"],
           ["trend", "推移"],
         ] as [RecordTab, string][]).map(([tab, label]) => (
@@ -446,9 +477,31 @@ export default function RecordPage() {
         ))}
       </div>
 
-      {activeTab === "daily" && (
+      {activeTab === "input" && (
+        <RecordInputTab
+          amount={amount}
+          category={category}
+          date={date}
+          display={display}
+          expression={expression}
+          memo={memo}
+          paymentMethod={paymentMethod}
+          categories={ledger.manualCategories}
+          saving={saving}
+          isLocked={ledger.context.isLocked}
+          onAmountChange={setAmountFromInput}
+          onCalcPress={calcPress}
+          onCategoryChange={setCategory}
+          onDateChange={setDate}
+          onMemoChange={setMemo}
+          onPaymentChange={setPaymentMethod}
+          onSave={saveEntry}
+        />
+      )}
+
+      {activeTab === "history" && (
         <DailyTab
-          groups={ledger.dailyGroups}
+          groups={historyGroups}
           selectedDate={selectedDate}
           expandedDates={expandedDates}
           expandedCategories={expandedCategories}
@@ -477,15 +530,17 @@ export default function RecordPage() {
         />
       )}
 
-      <button
-        type="button"
-        onClick={() => openEntrySheet()}
-        disabled={ledger.context.isLocked}
-        className="fixed right-5 z-40 px-5 py-3 rounded-full text-sm font-bold shadow-lg active:scale-[0.98] disabled:opacity-50"
-        style={{ bottom: "82px", backgroundColor: "var(--accent)", color: "#FFFFFF" }}
-      >
-        ＋入力
-      </button>
+      {activeTab !== "input" && (
+        <button
+          type="button"
+          onClick={() => changeTab("input")}
+          disabled={ledger.context.isLocked}
+          className="fixed right-5 z-40 px-5 py-3 rounded-full text-sm font-bold shadow-lg active:scale-[0.98] disabled:opacity-50"
+          style={{ bottom: "82px", backgroundColor: "var(--accent)", color: "#FFFFFF" }}
+        >
+          ＋入力
+        </button>
+      )}
 
       {entryOpen && (
         <EntrySheet
@@ -499,6 +554,7 @@ export default function RecordPage() {
           categories={ledger.manualCategories}
           saving={saving}
           editing={Boolean(editingItem)}
+          onAmountChange={setAmountFromInput}
           onCalcPress={calcPress}
           onCategoryChange={setCategory}
           onClose={closeEntrySheet}
@@ -516,6 +572,45 @@ export default function RecordPage() {
         </div>
       )}
     </div>
+  );
+}
+
+function RecordInputTab(props: {
+  amount: string;
+  category: string;
+  date: string;
+  display: string;
+  expression: string | null;
+  memo: string;
+  paymentMethod: PaymentMethod;
+  categories: LedgerDashboardData["manualCategories"];
+  saving: boolean;
+  isLocked: boolean;
+  onAmountChange: (amount: string) => void;
+  onCalcPress: (key: string) => void;
+  onCategoryChange: (category: string) => void;
+  onDateChange: (date: string) => void;
+  onMemoChange: (memo: string) => void;
+  onPaymentChange: (payment: PaymentMethod) => void;
+  onSave: () => void;
+}) {
+  return (
+    <section className="card p-4 space-y-4">
+      <div>
+        <h2 className="text-base font-medium" style={{ color: "var(--ink)" }}>支出を入力</h2>
+        <p className="text-xs mt-1" style={{ color: "var(--warm-gray-400)" }}>
+          金額・カテゴリ・日付を入れて記録します
+        </p>
+      </div>
+
+      {props.isLocked ? (
+        <p className="text-xs rounded px-3 py-2 text-center" style={{ backgroundColor: "var(--warm-gray-100)", color: "var(--warm-gray-600)" }}>
+          確定済み月のため、手入力支出は追加できません
+        </p>
+      ) : (
+        <EntryFormContent {...props} editing={false} stickySave={false} />
+      )}
+    </section>
   );
 }
 
@@ -900,6 +995,192 @@ function TrendTab({
   );
 }
 
+function EntryFormContent({
+  amount,
+  category,
+  date,
+  expression,
+  memo,
+  paymentMethod,
+  categories,
+  saving,
+  editing,
+  stickySave,
+  onAmountChange,
+  onCalcPress,
+  onCategoryChange,
+  onDateChange,
+  onMemoChange,
+  onPaymentChange,
+  onSave,
+}: {
+  amount: string;
+  category: string;
+  date: string;
+  display: string;
+  expression: string | null;
+  memo: string;
+  paymentMethod: PaymentMethod;
+  categories: LedgerDashboardData["manualCategories"];
+  saving: boolean;
+  editing: boolean;
+  stickySave: boolean;
+  onAmountChange: (amount: string) => void;
+  onCalcPress: (key: string) => void;
+  onCategoryChange: (category: string) => void;
+  onDateChange: (date: string) => void;
+  onMemoChange: (memo: string) => void;
+  onPaymentChange: (payment: PaymentMethod) => void;
+  onSave: () => void;
+}) {
+  const calcKeys = [
+    { k: "7", l: "7", s: "n" }, { k: "8", l: "8", s: "n" }, { k: "9", l: "9", s: "n" }, { k: "/", l: "÷", s: "o" },
+    { k: "4", l: "4", s: "n" }, { k: "5", l: "5", s: "n" }, { k: "6", l: "6", s: "n" }, { k: "*", l: "×", s: "o" },
+    { k: "1", l: "1", s: "n" }, { k: "2", l: "2", s: "n" }, { k: "3", l: "3", s: "n" }, { k: "-", l: "−", s: "o" },
+    { k: "C", l: "C", s: "c" }, { k: "0", l: "0", s: "n" }, { k: "00", l: "00", s: "n" }, { k: "+", l: "+", s: "o" },
+    { k: "back", l: "⌫", s: "f" }, { k: "=", l: "=", s: "e", span: 3 },
+  ];
+
+  const saveButton = (
+    <button
+      type="button"
+      onClick={onSave}
+      disabled={saving || !amount || !category}
+      className="w-full py-3.5 text-base font-bold disabled:opacity-40 active:scale-[0.98]"
+      style={{ borderRadius: "4px", backgroundColor: "var(--accent)", color: "#FFFFFF" }}
+    >
+      {saving ? "保存中..." : editing ? "更新する" : "記録する"}
+    </button>
+  );
+
+  return (
+    <>
+      <div className="card p-4">
+        {expression && <p className="text-xs font-amount text-right mb-1" style={{ color: "var(--warm-gray-400)" }}>{expression}</p>}
+        <label className="text-xs font-light tracking-wide block mb-1.5" style={{ color: "var(--warm-gray-400)" }}>金額</label>
+        <div className="flex items-center gap-2">
+          <span className="font-amount text-lg" style={{ color: "var(--warm-gray-300)" }}>¥</span>
+          <input
+            type="text"
+            inputMode="numeric"
+            value={amount}
+            onChange={(e) => onAmountChange(e.target.value)}
+            placeholder="0"
+            className="min-w-0 flex-1 font-amount font-extrabold bg-transparent text-right outline-none"
+            style={{ fontSize: "34px", color: amount ? "var(--ink)" : "var(--warm-gray-200)" }}
+          />
+        </div>
+      </div>
+
+      <div>
+        <label className="text-xs font-light tracking-wide block mb-2" style={{ color: "var(--warm-gray-400)" }}>カテゴリ</label>
+        <div className="flex gap-2 overflow-x-auto pb-2">
+          {categories.map((cat) => (
+            <button
+              key={cat.id}
+              type="button"
+              onClick={() => onCategoryChange(cat.name)}
+              className="shrink-0 px-3 py-2 rounded-full text-xs font-medium"
+              style={{
+                backgroundColor: category === cat.name ? "var(--accent)" : "var(--warm-gray-50)",
+                color: category === cat.name ? "#FFFFFF" : "var(--warm-gray-600)",
+                border: category === cat.name ? "1px solid var(--accent)" : "1px solid var(--border)",
+              }}
+            >
+              {cat.icon} {cat.name}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      <div className="grid grid-cols-2 gap-3">
+        <div>
+          <label className="text-xs font-light tracking-wide block mb-1.5" style={{ color: "var(--warm-gray-400)" }}>日付</label>
+          <input
+            type="date"
+            value={date}
+            onChange={(e) => onDateChange(e.target.value)}
+            className="w-full rounded px-3 py-2 outline-none"
+            style={{ fontSize: "16px", border: "1px solid var(--border)", color: "var(--ink)" }}
+          />
+        </div>
+        <div>
+          <label className="text-xs font-light tracking-wide block mb-1.5" style={{ color: "var(--warm-gray-400)" }}>メモ</label>
+          <input
+            type="text"
+            value={memo}
+            onChange={(e) => onMemoChange(e.target.value)}
+            placeholder="任意"
+            className="w-full rounded px-3 py-2 outline-none"
+            style={{ fontSize: "16px", border: "1px solid var(--border)", color: "var(--ink)" }}
+          />
+        </div>
+      </div>
+
+      <div>
+        <label className="text-xs font-light tracking-wide block mb-2" style={{ color: "var(--warm-gray-400)" }}>支払い方法</label>
+        <div className="grid grid-cols-2 gap-2">
+          {PAYMENT_METHODS.map((pm) => (
+            <button
+              key={pm.key}
+              type="button"
+              onClick={() => onPaymentChange(pm.key)}
+              className="py-2.5 rounded text-xs font-medium"
+              style={{
+                backgroundColor: paymentMethod === pm.key ? "var(--accent-light)" : "var(--warm-gray-50)",
+                color: paymentMethod === pm.key ? "var(--accent-dark)" : "var(--warm-gray-600)",
+                border: paymentMethod === pm.key ? "1px solid var(--accent-muted)" : "1px solid var(--border)",
+              }}
+            >
+              {pm.icon} {pm.label}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      <div className="grid grid-cols-4 gap-1.5">
+        {calcKeys.map(({ k, l, s, span }) => (
+          <button
+            key={k}
+            type="button"
+            onClick={() => onCalcPress(k)}
+            className={`font-amount font-bold select-none active:scale-[0.97] ${span === 3 ? "col-span-3" : ""}`}
+            style={{
+              height: "46px",
+              borderRadius: "4px",
+              fontSize: "16px",
+              backgroundColor:
+                s === "n" ? "var(--bg-card)" :
+                s === "f" ? "var(--warm-gray-100)" :
+                s === "o" ? "var(--accent-light)" :
+                s === "c" ? "var(--error-light)" :
+                "var(--accent)",
+              color:
+                s === "n" ? "var(--ink)" :
+                s === "f" ? "var(--warm-gray-600)" :
+                s === "o" ? "var(--accent-dark)" :
+                s === "c" ? "var(--error)" :
+                "#FFFFFF",
+              border: s === "n" ? "1px solid var(--border)" : "1px solid transparent",
+            }}
+          >
+            {l}
+          </button>
+        ))}
+      </div>
+
+      {stickySave ? (
+        <div
+          className="sticky bottom-0 -mx-4 px-4 pt-2"
+          style={{ backgroundColor: "var(--bg)", paddingBottom: "calc(16px + env(safe-area-inset-bottom))" }}
+        >
+          {saveButton}
+        </div>
+      ) : saveButton}
+    </>
+  );
+}
+
 function EntrySheet({
   amount,
   category,
@@ -911,6 +1192,7 @@ function EntrySheet({
   categories,
   saving,
   editing,
+  onAmountChange,
   onCalcPress,
   onCategoryChange,
   onClose,
@@ -929,6 +1211,7 @@ function EntrySheet({
   categories: LedgerDashboardData["manualCategories"];
   saving: boolean;
   editing: boolean;
+  onAmountChange: (amount: string) => void;
   onCalcPress: (key: string) => void;
   onCategoryChange: (category: string) => void;
   onClose: () => void;
@@ -949,132 +1232,26 @@ function EntrySheet({
           <button onClick={onClose} className="text-sm px-2 py-1" style={{ color: "var(--warm-gray-400)" }}>閉じる</button>
         </div>
 
-        <div className="card p-4">
-          {expression && <p className="text-xs font-amount text-right mb-1" style={{ color: "var(--warm-gray-400)" }}>{expression}</p>}
-          <div className="flex items-baseline gap-2 justify-end">
-            <span className="font-amount text-lg" style={{ color: "var(--warm-gray-300)" }}>¥</span>
-            <span className="font-amount font-extrabold" style={{ fontSize: "34px", color: display === "0" ? "var(--warm-gray-200)" : "var(--ink)" }}>
-              {display === "0" ? "0" : parseInt(display).toLocaleString()}
-            </span>
-          </div>
-        </div>
-
-        <div>
-          <label className="text-xs font-light tracking-wide block mb-2" style={{ color: "var(--warm-gray-400)" }}>カテゴリ</label>
-          <div className="flex gap-2 overflow-x-auto pb-2">
-            {categories.map((cat) => (
-              <button
-                key={cat.id}
-                type="button"
-                onClick={() => onCategoryChange(cat.name)}
-                className="shrink-0 px-3 py-2 rounded-full text-xs font-medium"
-                style={{
-                  backgroundColor: category === cat.name ? "var(--accent)" : "var(--warm-gray-50)",
-                  color: category === cat.name ? "#FFFFFF" : "var(--warm-gray-600)",
-                  border: category === cat.name ? "1px solid var(--accent)" : "1px solid var(--border)",
-                }}
-              >
-                {cat.icon} {cat.name}
-              </button>
-            ))}
-          </div>
-        </div>
-
-        <div className="grid grid-cols-2 gap-3">
-          <div>
-            <label className="text-xs font-light tracking-wide block mb-1.5" style={{ color: "var(--warm-gray-400)" }}>日付</label>
-            <input
-              type="date"
-              value={date}
-              onChange={(e) => onDateChange(e.target.value)}
-              className="w-full rounded px-3 py-2 outline-none"
-              style={{ fontSize: "16px", border: "1px solid var(--border)", color: "var(--ink)" }}
-            />
-          </div>
-          <div>
-            <label className="text-xs font-light tracking-wide block mb-1.5" style={{ color: "var(--warm-gray-400)" }}>メモ</label>
-            <input
-              type="text"
-              value={memo}
-              onChange={(e) => onMemoChange(e.target.value)}
-              placeholder="任意"
-              className="w-full rounded px-3 py-2 outline-none"
-              style={{ fontSize: "16px", border: "1px solid var(--border)", color: "var(--ink)" }}
-            />
-          </div>
-        </div>
-
-        <div>
-          <label className="text-xs font-light tracking-wide block mb-2" style={{ color: "var(--warm-gray-400)" }}>支払い方法</label>
-          <div className="grid grid-cols-2 gap-2">
-            {PAYMENT_METHODS.map((pm) => (
-              <button
-                key={pm.key}
-                type="button"
-                onClick={() => onPaymentChange(pm.key)}
-                className="py-2.5 rounded text-xs font-medium"
-                style={{
-                  backgroundColor: paymentMethod === pm.key ? "var(--accent-light)" : "var(--warm-gray-50)",
-                  color: paymentMethod === pm.key ? "var(--accent-dark)" : "var(--warm-gray-600)",
-                  border: paymentMethod === pm.key ? "1px solid var(--accent-muted)" : "1px solid var(--border)",
-                }}
-              >
-                {pm.icon} {pm.label}
-              </button>
-            ))}
-          </div>
-        </div>
-
-        <div className="grid grid-cols-4 gap-1.5">
-          {[
-            { k: "7", l: "7", s: "n" }, { k: "8", l: "8", s: "n" }, { k: "9", l: "9", s: "n" }, { k: "back", l: "⌫", s: "f" },
-            { k: "4", l: "4", s: "n" }, { k: "5", l: "5", s: "n" }, { k: "6", l: "6", s: "n" }, { k: "+", l: "+", s: "o" },
-            { k: "1", l: "1", s: "n" }, { k: "2", l: "2", s: "n" }, { k: "3", l: "3", s: "n" }, { k: "-", l: "−", s: "o" },
-            { k: "C", l: "C", s: "c" }, { k: "0", l: "0", s: "n" }, { k: "00", l: "00", s: "n" }, { k: "=", l: "=", s: "e" },
-          ].map(({ k, l, s }) => (
-            <button
-              key={k}
-              type="button"
-              onClick={() => onCalcPress(k)}
-              className="font-amount font-bold select-none active:scale-[0.97]"
-              style={{
-                height: "46px",
-                borderRadius: "4px",
-                fontSize: "16px",
-                backgroundColor:
-                  s === "n" ? "var(--bg-card)" :
-                  s === "f" ? "var(--warm-gray-100)" :
-                  s === "o" ? "var(--accent-light)" :
-                  s === "c" ? "var(--error-light)" :
-                  "var(--accent)",
-                color:
-                  s === "n" ? "var(--ink)" :
-                  s === "f" ? "var(--warm-gray-600)" :
-                  s === "o" ? "var(--accent-dark)" :
-                  s === "c" ? "var(--error)" :
-                  "#FFFFFF",
-                border: s === "n" ? "1px solid var(--border)" : "1px solid transparent",
-              }}
-            >
-              {l}
-            </button>
-          ))}
-        </div>
-
-        <div
-          className="sticky bottom-0 -mx-4 px-4 pt-2"
-          style={{ backgroundColor: "var(--bg)", paddingBottom: "calc(16px + env(safe-area-inset-bottom))" }}
-        >
-          <button
-            type="button"
-            onClick={onSave}
-            disabled={saving || !amount || !category}
-            className="w-full py-3.5 text-base font-bold disabled:opacity-40 active:scale-[0.98]"
-            style={{ borderRadius: "4px", backgroundColor: "var(--accent)", color: "#FFFFFF" }}
-          >
-            {saving ? "保存中..." : editing ? "更新する" : "記録する"}
-          </button>
-        </div>
+        <EntryFormContent
+          amount={amount}
+          category={category}
+          date={date}
+          display={display}
+          expression={expression}
+          memo={memo}
+          paymentMethod={paymentMethod}
+          categories={categories}
+          saving={saving}
+          editing={editing}
+          stickySave
+          onAmountChange={onAmountChange}
+          onCalcPress={onCalcPress}
+          onCategoryChange={onCategoryChange}
+          onDateChange={onDateChange}
+          onMemoChange={onMemoChange}
+          onPaymentChange={onPaymentChange}
+          onSave={onSave}
+        />
       </div>
     </div>
   );

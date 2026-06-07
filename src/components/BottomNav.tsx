@@ -13,7 +13,7 @@ type NavTab = {
 const tabs: NavTab[] = [
   { href: "/", label: "ホーム", icon: "🏠" },
   { href: "/fixed-costs", label: "固定費", icon: "💸" },
-  { href: "/record?input=1", activeHref: "/record", label: "記録", icon: "📋" },
+  { href: "/record", label: "記録", icon: "📋" },
   { href: "/settings", label: "設定", icon: "⚙️" },
 ];
 
@@ -34,7 +34,7 @@ export default function BottomNav() {
               onClick={(event) => {
                 if (opensRecordInput && pathname.startsWith("/record")) {
                   event.preventDefault();
-                  window.dispatchEvent(new CustomEvent("open-record-entry"));
+                  window.dispatchEvent(new CustomEvent("show-record-input"));
                 }
               }}
               className="flex-1 flex flex-col items-center relative py-2.5 transition-colors"

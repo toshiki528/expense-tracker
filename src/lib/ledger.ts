@@ -319,7 +319,7 @@ export function groupLedgerItemsByDate(
   }
 
   return Array.from(groups.entries())
-    .sort(([a], [b]) => a.localeCompare(b))
+    .sort(([a], [b]) => b.localeCompare(a))
     .map(([date, dayItems]) => {
       const categoryMap = new Map<string, LedgerItem[]>();
       for (const item of dayItems) {
