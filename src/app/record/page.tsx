@@ -145,15 +145,6 @@ export default function RecordPage() {
     freshRef.current = true;
   };
 
-  const setAmountFromInput = (value: string) => {
-    const digits = value.replace(/[^\d]/g, "").slice(0, 8);
-    setDisplay(digits || "0");
-    setExpression(null);
-    pendingRef.current = null;
-    opRef.current = null;
-    freshRef.current = false;
-  };
-
   const operatorLabel = (operator: CalcOperator) => {
     if (operator === "*") return "×";
     if (operator === "/") return "÷";
@@ -482,14 +473,12 @@ export default function RecordPage() {
           amount={amount}
           category={category}
           date={date}
-          display={display}
           expression={expression}
           memo={memo}
           paymentMethod={paymentMethod}
           categories={ledger.manualCategories}
           saving={saving}
           isLocked={ledger.context.isLocked}
-          onAmountChange={setAmountFromInput}
           onCalcPress={calcPress}
           onCategoryChange={setCategory}
           onDateChange={setDate}
@@ -547,14 +536,12 @@ export default function RecordPage() {
           amount={amount}
           category={category}
           date={date}
-          display={display}
           expression={expression}
           memo={memo}
           paymentMethod={paymentMethod}
           categories={ledger.manualCategories}
           saving={saving}
           editing={Boolean(editingItem)}
-          onAmountChange={setAmountFromInput}
           onCalcPress={calcPress}
           onCategoryChange={setCategory}
           onClose={closeEntrySheet}
@@ -579,14 +566,12 @@ function RecordInputTab(props: {
   amount: string;
   category: string;
   date: string;
-  display: string;
   expression: string | null;
   memo: string;
   paymentMethod: PaymentMethod;
   categories: LedgerDashboardData["manualCategories"];
   saving: boolean;
   isLocked: boolean;
-  onAmountChange: (amount: string) => void;
   onCalcPress: (key: string) => void;
   onCategoryChange: (category: string) => void;
   onDateChange: (date: string) => void;
@@ -1006,7 +991,6 @@ function EntryFormContent({
   saving,
   editing,
   stickySave,
-  onAmountChange,
   onCalcPress,
   onCategoryChange,
   onDateChange,
@@ -1017,7 +1001,6 @@ function EntryFormContent({
   amount: string;
   category: string;
   date: string;
-  display: string;
   expression: string | null;
   memo: string;
   paymentMethod: PaymentMethod;
@@ -1025,7 +1008,6 @@ function EntryFormContent({
   saving: boolean;
   editing: boolean;
   stickySave: boolean;
-  onAmountChange: (amount: string) => void;
   onCalcPress: (key: string) => void;
   onCategoryChange: (category: string) => void;
   onDateChange: (date: string) => void;
@@ -1060,15 +1042,13 @@ function EntryFormContent({
         <label className="text-xs font-light tracking-wide block mb-1.5" style={{ color: "var(--warm-gray-400)" }}>金額</label>
         <div className="flex items-center gap-2">
           <span className="font-amount text-lg" style={{ color: "var(--warm-gray-300)" }}>¥</span>
-          <input
-            type="text"
-            inputMode="numeric"
-            value={amount}
-            onChange={(e) => onAmountChange(e.target.value)}
-            placeholder="0"
-            className="min-w-0 flex-1 font-amount font-extrabold bg-transparent text-right outline-none"
+          <div
+            className="min-w-0 flex-1 font-amount font-extrabold text-right select-none"
             style={{ fontSize: "34px", color: amount ? "var(--ink)" : "var(--warm-gray-200)" }}
-          />
+            aria-live="polite"
+          >
+            {amount ? parseInt(amount).toLocaleString() : "0"}
+          </div>
         </div>
       </div>
 
@@ -1185,14 +1165,12 @@ function EntrySheet({
   amount,
   category,
   date,
-  display,
   expression,
   memo,
   paymentMethod,
   categories,
   saving,
   editing,
-  onAmountChange,
   onCalcPress,
   onCategoryChange,
   onClose,
@@ -1204,14 +1182,12 @@ function EntrySheet({
   amount: string;
   category: string;
   date: string;
-  display: string;
   expression: string | null;
   memo: string;
   paymentMethod: PaymentMethod;
   categories: LedgerDashboardData["manualCategories"];
   saving: boolean;
   editing: boolean;
-  onAmountChange: (amount: string) => void;
   onCalcPress: (key: string) => void;
   onCategoryChange: (category: string) => void;
   onClose: () => void;
@@ -1236,7 +1212,6 @@ function EntrySheet({
           amount={amount}
           category={category}
           date={date}
-          display={display}
           expression={expression}
           memo={memo}
           paymentMethod={paymentMethod}
@@ -1244,7 +1219,6 @@ function EntrySheet({
           saving={saving}
           editing={editing}
           stickySave
-          onAmountChange={onAmountChange}
           onCalcPress={onCalcPress}
           onCategoryChange={onCategoryChange}
           onDateChange={onDateChange}
