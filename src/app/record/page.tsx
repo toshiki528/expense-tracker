@@ -411,11 +411,11 @@ export default function RecordPage() {
   const showCompactSummary = activeTab !== "input";
 
   return (
-    <div className="space-y-3 pb-28 overflow-x-hidden">
+    <div className="space-y-2 pb-28 overflow-x-hidden">
       <div className="flex items-center justify-between px-1">
-        <button onClick={() => navigate(-1)} className="text-xl px-3 py-2" style={{ color: "var(--warm-gray-400)" }}>‹</button>
+        <button onClick={() => navigate(-1)} className="text-xl px-3 py-1" style={{ color: "var(--warm-gray-400)" }}>‹</button>
         <h1 className="text-sm font-bold tracking-wide" style={{ color: "var(--ink)" }}>{ledger.context.label}</h1>
-        <button onClick={() => navigate(1)} className="text-xl px-3 py-2" style={{ color: "var(--warm-gray-400)" }}>›</button>
+        <button onClick={() => navigate(1)} className="text-xl px-3 py-1" style={{ color: "var(--warm-gray-400)" }}>›</button>
       </div>
 
       {ledger.context.isLocked && (
@@ -440,7 +440,7 @@ export default function RecordPage() {
         </section>
       )}
 
-      <div className="-mx-5 grid grid-cols-4 gap-1 px-5 py-2" style={{ backgroundColor: "var(--bg-card)", borderBottom: "1px solid var(--border)" }}>
+      <div className="-mx-5 grid grid-cols-4 gap-1 px-5 py-1.5" style={{ backgroundColor: "var(--bg-card)", borderBottom: "1px solid var(--border)" }}>
         {([
           ["input", "入力"],
           ["history", "履歴"],
@@ -450,7 +450,7 @@ export default function RecordPage() {
           <button
             key={tab}
             onClick={() => changeTab(tab)}
-            className="py-2.5 rounded-lg text-sm font-bold transition-colors outline-none"
+            className="py-2 rounded-lg text-sm font-bold transition-colors outline-none"
             style={{
               backgroundColor: activeTab === tab ? "var(--bg-card)" : "transparent",
               color: activeTab === tab ? "var(--accent)" : "var(--warm-gray-500)",
@@ -579,7 +579,7 @@ function RecordInputTab(props: {
           確定済み月のため、手入力支出は追加できません
         </p>
       ) : (
-        <EntryFormContent {...props} editing={false} stickySave stickySaveOffset="74px" />
+        <EntryFormContent {...props} editing={false} stickySave stickySaveOffset="70px" />
       )}
     </section>
   );
@@ -1003,16 +1003,6 @@ function EntryFormContent({
   ];
 
   const selectedCategory = categories.find((cat) => cat.name === category);
-  const categoryGridItems = categories.flatMap((_, index, source) => {
-    if (index % 8 !== 0) return [];
-    const chunk = source.slice(index, index + 8);
-    const ordered: typeof categories = [];
-    for (let column = 0; column < 4; column++) {
-      if (chunk[column]) ordered.push(chunk[column]);
-      if (chunk[column + 4]) ordered.push(chunk[column + 4]);
-    }
-    return ordered;
-  });
 
   const saveButton = (
     <button
@@ -1028,12 +1018,12 @@ function EntryFormContent({
 
   return (
     <>
-      <div className="space-y-3">
-        <div className="flex items-start justify-between gap-3">
-          <div className="flex rounded-lg p-1" style={{ backgroundColor: "var(--warm-gray-100)" }}>
+      <div className="space-y-2">
+        <div className="flex items-center justify-between gap-3">
+          <div className="flex shrink-0 rounded-lg p-1" style={{ backgroundColor: "var(--warm-gray-100)" }}>
             <button
               type="button"
-              className="rounded-md px-3 py-1.5 text-xs font-bold"
+              className="rounded-md px-3 py-1 text-xs font-bold"
               style={{ backgroundColor: "var(--accent)", color: "#FFFFFF" }}
             >
               支出
@@ -1041,7 +1031,7 @@ function EntryFormContent({
             <button
               type="button"
               disabled
-              className="rounded-md px-3 py-1.5 text-xs font-bold disabled:opacity-50"
+              className="rounded-md px-3 py-1 text-xs font-bold disabled:opacity-50"
               style={{ color: "var(--warm-gray-500)" }}
             >
               収入
@@ -1057,11 +1047,11 @@ function EntryFormContent({
           )}
         </div>
 
-        <div className="flex items-end justify-end gap-2 border-b pb-2" style={{ borderColor: "var(--border)" }}>
-          <span className="font-amount text-2xl font-bold" style={{ color: "var(--warm-gray-300)" }}>¥</span>
+        <div className="flex items-end justify-end gap-2 border-b pb-1.5" style={{ borderColor: "var(--border)" }}>
+          <span className="font-amount text-xl font-bold" style={{ color: "var(--warm-gray-300)" }}>¥</span>
           <div
             className="min-w-0 font-amount font-extrabold leading-none text-right select-none"
-            style={{ fontSize: "46px", color: amount ? "var(--ink)" : "var(--warm-gray-300)" }}
+            style={{ fontSize: "36px", color: amount ? "var(--ink)" : "var(--warm-gray-300)" }}
             aria-live="polite"
           >
             {amount ? parseInt(amount).toLocaleString() : "0"}
@@ -1070,22 +1060,25 @@ function EntryFormContent({
       </div>
 
       <div>
-        <label className="text-xs font-bold tracking-wide block mb-2" style={{ color: "var(--warm-gray-400)" }}>カテゴリ</label>
-        <div className="grid grid-flow-col grid-rows-2 auto-cols-[82px] gap-2 overflow-x-auto pb-2">
-          {categoryGridItems.map((cat) => (
+        <div className="mb-1 flex items-center justify-between">
+          <label className="text-xs font-bold tracking-wide" style={{ color: "var(--warm-gray-400)" }}>カテゴリ</label>
+          <span className="text-[10px]" style={{ color: "var(--warm-gray-300)" }}>横にスライド</span>
+        </div>
+        <div className="flex gap-2 overflow-x-auto pb-1">
+          {categories.map((cat) => (
             <button
               key={cat.id}
               type="button"
               onClick={() => onCategoryChange(cat.name)}
-              className="h-[56px] rounded-lg px-2 text-center text-[11px] font-bold leading-tight"
+              className="h-[42px] shrink-0 rounded-lg px-3 text-center text-[11px] font-bold leading-tight"
               style={{
                 backgroundColor: category === cat.name ? "var(--accent-light)" : "var(--bg-card)",
                 color: category === cat.name ? "var(--accent-dark)" : "var(--warm-gray-600)",
                 border: category === cat.name ? "1px solid var(--accent)" : "1px solid var(--border)",
               }}
             >
-              <span className="block text-lg leading-none">{cat.icon}</span>
-              <span className="mt-1 block truncate">{cat.name}</span>
+              <span className="mr-1 text-base leading-none">{cat.icon}</span>
+              {cat.name}
             </button>
           ))}
         </div>
@@ -1097,13 +1090,13 @@ function EntryFormContent({
           value={date}
           onChange={(e) => onDateChange(e.target.value)}
           aria-label="日付"
-          className="w-full rounded-lg px-2 py-2.5 outline-none"
+          className="w-full rounded-lg px-2 py-2 outline-none"
           style={{ fontSize: "16px", border: "1px solid var(--border)", color: "var(--ink)", backgroundColor: "var(--bg-card)" }}
         />
         <button
           type="button"
           onClick={() => onPaymentChange(paymentMethod === "cash" ? "credit" : "cash")}
-          className="rounded-lg px-2 py-2.5 text-xs font-bold"
+          className="rounded-lg px-2 py-2 text-xs font-bold"
           style={{ backgroundColor: "var(--accent-light)", color: "var(--accent-dark)", border: "1px solid var(--accent-muted)" }}
         >
           {PAYMENT_METHODS.find((pm) => pm.key === paymentMethod)?.icon} {PAYMENT_METHODS.find((pm) => pm.key === paymentMethod)?.label}
@@ -1114,12 +1107,12 @@ function EntryFormContent({
           onChange={(e) => onMemoChange(e.target.value)}
           placeholder="メモ"
           aria-label="メモ"
-          className="w-full rounded-lg px-3 py-2.5 outline-none"
+          className="w-full rounded-lg px-3 py-2 outline-none"
           style={{ fontSize: "16px", border: "1px solid var(--border)", color: "var(--ink)", backgroundColor: "var(--bg-card)" }}
         />
       </div>
 
-      <div className="grid grid-cols-4 gap-1.5">
+      <div className="grid grid-cols-4 gap-1">
         {calcKeys.map(({ k, l, s, span }) => (
           <button
             key={k}
@@ -1127,9 +1120,9 @@ function EntryFormContent({
             onClick={() => onCalcPress(k)}
             className={`font-amount font-bold select-none active:scale-[0.97] ${span === 3 ? "col-span-3" : ""}`}
             style={{
-              height: "44px",
+              height: "clamp(36px, 5dvh, 40px)",
               borderRadius: "8px",
-              fontSize: "20px",
+              fontSize: "18px",
               backgroundColor:
                 s === "n" ? "var(--bg-card)" :
                 s === "f" ? "var(--warm-gray-100)" :
@@ -1152,11 +1145,16 @@ function EntryFormContent({
 
       {stickySave ? (
         <div
-          className="sticky bottom-0 -mx-4 px-4 pt-2"
+          className="-mx-4 px-4 pt-1.5"
           style={{
+            position: stickySaveOffset ? "fixed" : "sticky",
             bottom: stickySaveOffset || "0px",
+            left: stickySaveOffset ? "50%" : undefined,
+            transform: stickySaveOffset ? "translateX(-50%)" : undefined,
+            width: stickySaveOffset ? "min(100vw, 512px)" : undefined,
+            zIndex: stickySaveOffset ? 60 : undefined,
             backgroundColor: "var(--bg)",
-            paddingBottom: "calc(14px + env(safe-area-inset-bottom))",
+            paddingBottom: "calc(10px + env(safe-area-inset-bottom))",
           }}
         >
           {saveButton}
