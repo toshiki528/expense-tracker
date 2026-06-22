@@ -55,7 +55,6 @@ export default function RecordPage() {
   const selectedDateRef = useRef("");
   const autoScrolledPeriodRef = useRef("");
   const [expandedDates, setExpandedDates] = useState<string[]>([]);
-  const [expandedCategories, setExpandedCategories] = useState<string[]>([]);
   const [entryOpen, setEntryOpen] = useState(false);
   const [editingItem, setEditingItem] = useState<LedgerItem | null>(null);
   const [saving, setSaving] = useState(false);
@@ -102,7 +101,10 @@ export default function RecordPage() {
 
     selectedDateRef.current = nextSelected;
     setSelectedDate(nextSelected);
-    setExpandedDates((prev) => (prev.length > 0 ? prev : [nextSelected]));
+    const selectedDay = data.dailyGroups.find((day) => day.date === nextSelected);
+    const firstSpentDay = data.dailyGroups.find((day) => day.date <= todayString() && day.total > 0);
+    const initialExpandedDate = selectedDay?.total ? nextSelected : firstSpentDay?.date || nextSelected;
+    setExpandedDates((prev) => (prev.length > 0 ? prev : [initialExpandedDate]));
     setLoading(false);
   }, [period]);
 
@@ -126,7 +128,6 @@ export default function RecordPage() {
   const navigate = (dir: -1 | 1) => {
     setPeriod(getAdjacentPeriod(period.year, period.month, dir));
     setExpandedDates([]);
-    setExpandedCategories([]);
   };
 
   const resetCalc = () => {
@@ -375,14 +376,6 @@ export default function RecordPage() {
     ));
   };
 
-  const toggleCategory = (key: string) => {
-    setExpandedCategories((prev) => (
-      prev.includes(key)
-        ? prev.filter((value) => value !== key)
-        : [...prev, key]
-    ));
-  };
-
   const filteredTrendItems = useMemo(() => {
     if (!ledger) return [];
     return ledger.items.filter((item) => {
@@ -415,12 +408,14 @@ export default function RecordPage() {
   const totalDays = ledger.dailyGroups.length || 1;
   const dailyAverage = Math.floor(ledger.totalSpent / totalDays);
 
+  const showCompactSummary = activeTab !== "input";
+
   return (
-    <div className="space-y-5 pb-28 overflow-x-hidden">
-      <div className="flex items-center justify-between px-2">
-        <button onClick={() => navigate(-1)} className="text-xl px-3 py-1" style={{ color: "var(--warm-gray-400)" }}>‹</button>
-        <h1 className="text-sm font-medium tracking-wide" style={{ color: "var(--ink)" }}>{ledger.context.label}</h1>
-        <button onClick={() => navigate(1)} className="text-xl px-3 py-1" style={{ color: "var(--warm-gray-400)" }}>›</button>
+    <div className="space-y-3 pb-28 overflow-x-hidden">
+      <div className="flex items-center justify-between px-1">
+        <button onClick={() => navigate(-1)} className="text-xl px-3 py-2" style={{ color: "var(--warm-gray-400)" }}>‹</button>
+        <h1 className="text-sm font-bold tracking-wide" style={{ color: "var(--ink)" }}>{ledger.context.label}</h1>
+        <button onClick={() => navigate(1)} className="text-xl px-3 py-2" style={{ color: "var(--warm-gray-400)" }}>›</button>
       </div>
 
       {ledger.context.isLocked && (
@@ -429,24 +424,23 @@ export default function RecordPage() {
         </div>
       )}
 
-      <section className="card p-5">
-        <div className="grid grid-cols-3 gap-3 text-center">
-          <div>
-            <p className="text-[10px] tracking-wide" style={{ color: "var(--warm-gray-400)" }}>支出合計</p>
-            <p className="font-amount text-lg font-bold" style={{ color: "var(--ink)" }}>¥{ledger.totalSpent.toLocaleString()}</p>
+      {showCompactSummary && (
+        <section className="-mx-5 px-5 py-3" style={{ backgroundColor: "var(--bg-card)", borderTop: "1px solid var(--border)", borderBottom: "1px solid var(--border)" }}>
+          <div className="grid grid-cols-3 gap-2 items-baseline">
+            <p className="text-xs font-medium" style={{ color: "var(--warm-gray-500)" }}>
+              支出合計 <span className="font-amount text-lg font-bold" style={{ color: "var(--ink)" }}>¥{ledger.totalSpent.toLocaleString()}</span>
+            </p>
+            <p className="text-xs font-medium text-center" style={{ color: "var(--warm-gray-500)" }}>
+              日平均 <span className="font-amount font-bold" style={{ color: "var(--accent)" }}>¥{dailyAverage.toLocaleString()}</span>
+            </p>
+            <p className="text-xs font-medium text-right" style={{ color: "var(--warm-gray-500)" }}>
+              <span className="font-amount font-bold" style={{ color: "var(--ink)" }}>{ledger.itemCount}</span>件
+            </p>
           </div>
-          <div>
-            <p className="text-[10px] tracking-wide" style={{ color: "var(--warm-gray-400)" }}>日平均</p>
-            <p className="font-amount text-lg font-bold" style={{ color: "var(--accent)" }}>¥{dailyAverage.toLocaleString()}</p>
-          </div>
-          <div>
-            <p className="text-[10px] tracking-wide" style={{ color: "var(--warm-gray-400)" }}>件数</p>
-            <p className="font-amount text-lg font-bold" style={{ color: "var(--ink)" }}>{ledger.itemCount}</p>
-          </div>
-        </div>
-      </section>
+        </section>
+      )}
 
-      <div className="grid grid-cols-4 gap-1 rounded p-1" style={{ backgroundColor: "var(--warm-gray-50)" }}>
+      <div className="-mx-5 grid grid-cols-4 gap-1 px-5 py-2" style={{ backgroundColor: "var(--bg-card)", borderBottom: "1px solid var(--border)" }}>
         {([
           ["input", "入力"],
           ["history", "履歴"],
@@ -456,11 +450,12 @@ export default function RecordPage() {
           <button
             key={tab}
             onClick={() => changeTab(tab)}
-            className="py-2 rounded text-sm font-medium transition-colors"
+            className="py-2.5 rounded-lg text-sm font-bold transition-colors outline-none"
             style={{
               backgroundColor: activeTab === tab ? "var(--bg-card)" : "transparent",
               color: activeTab === tab ? "var(--accent)" : "var(--warm-gray-500)",
-              boxShadow: activeTab === tab ? "0 1px 4px rgba(0,0,0,0.06)" : "none",
+              boxShadow: activeTab === tab ? "0 1px 8px rgba(26,26,26,0.08)" : "none",
+              border: activeTab === tab ? "1px solid var(--border)" : "1px solid transparent",
             }}
           >
             {label}
@@ -493,9 +488,7 @@ export default function RecordPage() {
           groups={historyGroups}
           selectedDate={selectedDate}
           expandedDates={expandedDates}
-          expandedCategories={expandedCategories}
           onToggleDate={toggleDate}
-          onToggleCategory={toggleCategory}
           onEdit={openEntrySheet}
           onDelete={deleteItem}
         />
@@ -580,20 +573,13 @@ function RecordInputTab(props: {
   onSave: () => void;
 }) {
   return (
-    <section className="card p-4 space-y-4">
-      <div>
-        <h2 className="text-base font-medium" style={{ color: "var(--ink)" }}>支出を入力</h2>
-        <p className="text-xs mt-1" style={{ color: "var(--warm-gray-400)" }}>
-          金額・カテゴリ・日付を入れて記録します
-        </p>
-      </div>
-
+    <section className="space-y-3">
       {props.isLocked ? (
         <p className="text-xs rounded px-3 py-2 text-center" style={{ backgroundColor: "var(--warm-gray-100)", color: "var(--warm-gray-600)" }}>
           確定済み月のため、手入力支出は追加できません
         </p>
       ) : (
-        <EntryFormContent {...props} editing={false} stickySave={false} />
+        <EntryFormContent {...props} editing={false} stickySave stickySaveOffset="74px" />
       )}
     </section>
   );
@@ -603,85 +589,72 @@ function DailyTab({
   groups,
   selectedDate,
   expandedDates,
-  expandedCategories,
   onToggleDate,
-  onToggleCategory,
   onEdit,
   onDelete,
 }: {
   groups: DailyLedgerGroup[];
   selectedDate: string;
   expandedDates: string[];
-  expandedCategories: string[];
   onToggleDate: (date: string) => void;
-  onToggleCategory: (key: string) => void;
   onEdit: (date?: string, item?: LedgerItem) => void;
   onDelete: (item: LedgerItem) => void;
 }) {
   return (
-    <div className="space-y-2">
+    <div className="-mx-5">
       {groups.map((day) => {
         const expanded = expandedDates.includes(day.date);
         const isSelected = selectedDate === day.date;
+        const dayItems = day.categories.flatMap((group) => group.items);
+        const icons = day.categories.slice(0, 4);
         return (
           <section
             key={day.date}
             data-ledger-date={day.date}
-            className="card overflow-hidden scroll-mt-24"
-            style={{ opacity: day.total === 0 ? 0.58 : 1 }}
+            className="scroll-mt-24"
+            style={{
+              backgroundColor: expanded ? "var(--accent-light)" : "var(--bg-card)",
+              borderTop: "1px solid var(--border)",
+              opacity: day.total === 0 ? 0.58 : 1,
+            }}
           >
             <button
               type="button"
               onClick={() => onToggleDate(day.date)}
-              className="w-full flex items-center justify-between px-4 py-3 text-left"
+              className="w-full flex items-center justify-between px-5 py-3 text-left"
               style={{ borderLeft: isSelected ? "3px solid var(--accent)" : "3px solid transparent" }}
             >
-              <div>
-                <p className="text-sm font-medium" style={{ color: "var(--ink)" }}>{formatDateLabel(day.date)}</p>
-                <p className="text-[10px]" style={{ color: "var(--warm-gray-400)" }}>{day.count > 0 ? `${day.count}件` : "記録なし"}</p>
+              <div className="min-w-0">
+                <p className="text-base font-bold leading-tight" style={{ color: day.total > 0 ? "var(--ink)" : "var(--warm-gray-400)" }}>{formatDateLabel(day.date)}</p>
+                <div className="mt-1 flex items-center gap-1.5">
+                  <span className="text-[10px]" style={{ color: "var(--warm-gray-500)" }}>{day.count > 0 ? `${day.count}件` : "記録なし"}</span>
+                  {icons.map((group) => (
+                    <span key={`${day.date}-${group.category}`} className="grid h-6 w-6 place-items-center rounded" style={{ backgroundColor: "var(--warm-gray-50)" }}>
+                      <span className="text-xs">{group.icon || "📦"}</span>
+                    </span>
+                  ))}
+                </div>
               </div>
-              <div className="text-right">
-                <p className="font-amount text-base font-bold" style={{ color: day.total > 0 ? "var(--ink)" : "var(--warm-gray-300)" }}>
+              <div className="text-right shrink-0">
+                <p className="font-amount text-base font-extrabold" style={{ color: day.total > 0 ? "var(--ink)" : "var(--warm-gray-300)" }}>
                   ¥{day.total.toLocaleString()}
                 </p>
-                <span className="text-xs" style={{ color: "var(--warm-gray-300)" }}>{expanded ? "閉じる" : "詳細"}</span>
+                <span className="text-sm" style={{ color: day.total > 0 ? "var(--accent)" : "var(--warm-gray-300)" }}>{expanded ? "⌃" : "⌄"}</span>
               </div>
             </button>
 
             {expanded && (
-              <div className="px-4 pb-4 space-y-2" style={{ borderTop: "1px solid var(--border)" }}>
-                {day.categories.length === 0 ? (
-                  <p className="text-sm text-center py-4" style={{ color: "var(--warm-gray-300)" }}>この日の支出はありません</p>
-                ) : day.categories.map((group) => {
-                  const key = `${day.date}-${group.category}`;
-                  const catExpanded = expandedCategories.includes(key);
-                  return (
-                    <div key={key} className="rounded" style={{ backgroundColor: "var(--warm-gray-50)" }}>
-                      <button
-                        type="button"
-                        onClick={() => onToggleCategory(key)}
-                        className="w-full flex items-center justify-between px-3 py-2.5 text-left"
-                      >
-                        <span className="text-sm font-medium" style={{ color: "var(--ink-light)" }}>
-                          {group.icon || "📦"} {group.category}
-                        </span>
-                        <span className="font-amount text-sm font-semibold" style={{ color: "var(--ink)" }}>¥{group.total.toLocaleString()}</span>
-                      </button>
-                      {catExpanded && (
-                        <div className="px-3 pb-3 space-y-2">
-                          {group.items.map((item) => (
-                            <LedgerItemRow
-                              key={item.id}
-                              item={item}
-                              onEdit={() => onEdit(day.date, item)}
-                              onDelete={() => onDelete(item)}
-                            />
-                          ))}
-                        </div>
-                      )}
-                    </div>
-                  );
-                })}
+              <div style={{ backgroundColor: "var(--bg-card)", borderTop: "1px solid var(--border)" }}>
+                {dayItems.length === 0 ? (
+                  <p className="text-sm text-center py-5" style={{ color: "var(--warm-gray-300)" }}>この日の支出はありません</p>
+                ) : dayItems.map((item) => (
+                  <LedgerItemRow
+                    key={item.id}
+                    item={item}
+                    onEdit={() => onEdit(day.date, item)}
+                    onDelete={() => onDelete(item)}
+                  />
+                ))}
               </div>
             )}
           </section>
@@ -693,45 +666,49 @@ function DailyTab({
 
 function LedgerItemRow({ item, onEdit, onDelete }: { item: LedgerItem; onEdit: () => void; onDelete: () => void }) {
   const isManual = item.source === "manual";
+  const paymentLabel = isManual ? (item.paymentMethod ? PAYMENT_LABELS[item.paymentMethod] : "手入力") : "ワリカン同期";
   return (
-    <div className="rounded p-3" style={{ backgroundColor: "var(--bg-card)", border: "1px solid var(--border)" }}>
-      <div className="flex items-start justify-between gap-3">
+    <div className="flex min-h-[60px] items-stretch" style={{ borderTop: "1px solid var(--border)" }}>
+      <div className="flex min-w-0 flex-1 items-center gap-3 px-5 py-2.5">
+        <span className="grid h-9 w-9 shrink-0 place-items-center rounded-lg" style={{ backgroundColor: "var(--warm-gray-50)" }}>
+          {item.categoryIcon || "📦"}
+        </span>
         <div className="min-w-0">
-          <p className="text-sm font-medium truncate" style={{ color: "var(--ink)" }}>
-            {item.memo || item.category}
+          <p className="truncate text-sm font-bold" style={{ color: "var(--ink)" }}>{item.memo || item.category}</p>
+          <p className="truncate text-[11px]" style={{ color: "var(--warm-gray-400)" }}>
+            {item.category} ・ {paymentLabel}
           </p>
-          <p className="text-[10px] mt-0.5" style={{ color: "var(--warm-gray-400)" }}>
-            {isManual ? (item.paymentMethod ? PAYMENT_LABELS[item.paymentMethod] : "手入力") : "ワリカン同期"}
-          </p>
-          {item.readonlyReason && (
-            <p className="text-[10px] mt-1" style={{ color: "var(--accent)" }}>{item.readonlyReason}</p>
-          )}
+          {item.readonlyReason && <p className="truncate text-[10px]" style={{ color: "var(--warm-gray-400)" }}>{item.readonlyReason}</p>}
         </div>
-        <div className="text-right shrink-0">
+      </div>
+      <div className="flex shrink-0 items-stretch">
+        <div className="flex w-[74px] items-center justify-end px-3">
           <p className="font-amount text-sm font-bold" style={{ color: "var(--ink)" }}>¥{item.amount.toLocaleString()}</p>
-          {isManual && (
-            <div className="flex gap-2 justify-end mt-2">
-              <button
-                type="button"
-                onClick={onEdit}
-                disabled={!item.editable}
-                className="text-[10px] px-2 py-1 rounded disabled:opacity-40"
-                style={{ backgroundColor: "var(--accent-light)", color: "var(--accent-dark)" }}
-              >
-                編集
-              </button>
-              <button
-                type="button"
-                onClick={onDelete}
-                disabled={!item.deleteable}
-                className="text-[10px] px-2 py-1 rounded disabled:opacity-40"
-                style={{ backgroundColor: "var(--error-light)", color: "var(--error)" }}
-              >
-                削除
-              </button>
-            </div>
-          )}
         </div>
+        {isManual && (
+          <>
+            <button
+              type="button"
+              onClick={onEdit}
+              disabled={!item.editable}
+              aria-label="編集"
+              className="grid w-12 place-items-center text-base font-bold disabled:opacity-40"
+              style={{ backgroundColor: "var(--accent)", color: "#FFFFFF" }}
+            >
+              ✎
+            </button>
+            <button
+              type="button"
+              onClick={onDelete}
+              disabled={!item.deleteable}
+              aria-label="削除"
+              className="grid w-12 place-items-center text-base font-bold disabled:opacity-40"
+              style={{ backgroundColor: "var(--error)", color: "#FFFFFF" }}
+            >
+              🗑
+            </button>
+          </>
+        )}
       </div>
     </div>
   );
@@ -991,6 +968,7 @@ function EntryFormContent({
   saving,
   editing,
   stickySave,
+  stickySaveOffset,
   onCalcPress,
   onCategoryChange,
   onDateChange,
@@ -1008,6 +986,7 @@ function EntryFormContent({
   saving: boolean;
   editing: boolean;
   stickySave: boolean;
+  stickySaveOffset?: string;
   onCalcPress: (key: string) => void;
   onCategoryChange: (category: string) => void;
   onDateChange: (date: string) => void;
@@ -1023,28 +1002,66 @@ function EntryFormContent({
     { k: "back", l: "⌫", s: "f" }, { k: "=", l: "=", s: "e", span: 3 },
   ];
 
+  const selectedCategory = categories.find((cat) => cat.name === category);
+  const categoryGridItems = categories.flatMap((_, index, source) => {
+    if (index % 8 !== 0) return [];
+    const chunk = source.slice(index, index + 8);
+    const ordered: typeof categories = [];
+    for (let column = 0; column < 4; column++) {
+      if (chunk[column]) ordered.push(chunk[column]);
+      if (chunk[column + 4]) ordered.push(chunk[column + 4]);
+    }
+    return ordered;
+  });
+
   const saveButton = (
     <button
       type="button"
       onClick={onSave}
       disabled={saving || !amount || !category}
       className="w-full py-3.5 text-base font-bold disabled:opacity-40 active:scale-[0.98]"
-      style={{ borderRadius: "4px", backgroundColor: "var(--accent)", color: "#FFFFFF" }}
+      style={{ borderRadius: "10px", backgroundColor: "var(--accent)", color: "#FFFFFF" }}
     >
-      {saving ? "保存中..." : editing ? "更新する" : "記録する"}
+      {saving ? "保存中..." : editing ? "✓ 更新する" : "✓ 記録する"}
     </button>
   );
 
   return (
     <>
-      <div className="card p-4">
-        {expression && <p className="text-xs font-amount text-right mb-1" style={{ color: "var(--warm-gray-400)" }}>{expression}</p>}
-        <label className="text-xs font-light tracking-wide block mb-1.5" style={{ color: "var(--warm-gray-400)" }}>金額</label>
-        <div className="flex items-center gap-2">
-          <span className="font-amount text-lg" style={{ color: "var(--warm-gray-300)" }}>¥</span>
+      <div className="space-y-3">
+        <div className="flex items-start justify-between gap-3">
+          <div className="flex rounded-lg p-1" style={{ backgroundColor: "var(--warm-gray-100)" }}>
+            <button
+              type="button"
+              className="rounded-md px-3 py-1.5 text-xs font-bold"
+              style={{ backgroundColor: "var(--accent)", color: "#FFFFFF" }}
+            >
+              支出
+            </button>
+            <button
+              type="button"
+              disabled
+              className="rounded-md px-3 py-1.5 text-xs font-bold disabled:opacity-50"
+              style={{ color: "var(--warm-gray-500)" }}
+            >
+              収入
+            </button>
+          </div>
+          {selectedCategory && (
+            <div className="min-w-0 text-right">
+              <p className="truncate text-xs font-bold" style={{ color: "var(--accent)" }}>
+                {selectedCategory.icon} {selectedCategory.name}
+              </p>
+              {expression && <p className="font-amount text-xs" style={{ color: "var(--warm-gray-400)" }}>{expression}</p>}
+            </div>
+          )}
+        </div>
+
+        <div className="flex items-end justify-end gap-2 border-b pb-2" style={{ borderColor: "var(--border)" }}>
+          <span className="font-amount text-2xl font-bold" style={{ color: "var(--warm-gray-300)" }}>¥</span>
           <div
-            className="min-w-0 flex-1 font-amount font-extrabold text-right select-none"
-            style={{ fontSize: "34px", color: amount ? "var(--ink)" : "var(--warm-gray-200)" }}
+            className="min-w-0 font-amount font-extrabold leading-none text-right select-none"
+            style={{ fontSize: "46px", color: amount ? "var(--ink)" : "var(--warm-gray-300)" }}
             aria-live="polite"
           >
             {amount ? parseInt(amount).toLocaleString() : "0"}
@@ -1053,69 +1070,53 @@ function EntryFormContent({
       </div>
 
       <div>
-        <label className="text-xs font-light tracking-wide block mb-2" style={{ color: "var(--warm-gray-400)" }}>カテゴリ</label>
-        <div className="flex gap-2 overflow-x-auto pb-2">
-          {categories.map((cat) => (
+        <label className="text-xs font-bold tracking-wide block mb-2" style={{ color: "var(--warm-gray-400)" }}>カテゴリ</label>
+        <div className="grid grid-flow-col grid-rows-2 auto-cols-[82px] gap-2 overflow-x-auto pb-2">
+          {categoryGridItems.map((cat) => (
             <button
               key={cat.id}
               type="button"
               onClick={() => onCategoryChange(cat.name)}
-              className="shrink-0 px-3 py-2 rounded-full text-xs font-medium"
+              className="h-[56px] rounded-lg px-2 text-center text-[11px] font-bold leading-tight"
               style={{
-                backgroundColor: category === cat.name ? "var(--accent)" : "var(--warm-gray-50)",
-                color: category === cat.name ? "#FFFFFF" : "var(--warm-gray-600)",
+                backgroundColor: category === cat.name ? "var(--accent-light)" : "var(--bg-card)",
+                color: category === cat.name ? "var(--accent-dark)" : "var(--warm-gray-600)",
                 border: category === cat.name ? "1px solid var(--accent)" : "1px solid var(--border)",
               }}
             >
-              {cat.icon} {cat.name}
+              <span className="block text-lg leading-none">{cat.icon}</span>
+              <span className="mt-1 block truncate">{cat.name}</span>
             </button>
           ))}
         </div>
       </div>
 
-      <div className="grid grid-cols-2 gap-3">
-        <div>
-          <label className="text-xs font-light tracking-wide block mb-1.5" style={{ color: "var(--warm-gray-400)" }}>日付</label>
-          <input
-            type="date"
-            value={date}
-            onChange={(e) => onDateChange(e.target.value)}
-            className="w-full rounded px-3 py-2 outline-none"
-            style={{ fontSize: "16px", border: "1px solid var(--border)", color: "var(--ink)" }}
-          />
-        </div>
-        <div>
-          <label className="text-xs font-light tracking-wide block mb-1.5" style={{ color: "var(--warm-gray-400)" }}>メモ</label>
-          <input
-            type="text"
-            value={memo}
-            onChange={(e) => onMemoChange(e.target.value)}
-            placeholder="任意"
-            className="w-full rounded px-3 py-2 outline-none"
-            style={{ fontSize: "16px", border: "1px solid var(--border)", color: "var(--ink)" }}
-          />
-        </div>
-      </div>
-
-      <div>
-        <label className="text-xs font-light tracking-wide block mb-2" style={{ color: "var(--warm-gray-400)" }}>支払い方法</label>
-        <div className="grid grid-cols-2 gap-2">
-          {PAYMENT_METHODS.map((pm) => (
-            <button
-              key={pm.key}
-              type="button"
-              onClick={() => onPaymentChange(pm.key)}
-              className="py-2.5 rounded text-xs font-medium"
-              style={{
-                backgroundColor: paymentMethod === pm.key ? "var(--accent-light)" : "var(--warm-gray-50)",
-                color: paymentMethod === pm.key ? "var(--accent-dark)" : "var(--warm-gray-600)",
-                border: paymentMethod === pm.key ? "1px solid var(--accent-muted)" : "1px solid var(--border)",
-              }}
-            >
-              {pm.icon} {pm.label}
-            </button>
-          ))}
-        </div>
+      <div className="grid grid-cols-[1.2fr_0.9fr_1fr] gap-2">
+        <input
+          type="date"
+          value={date}
+          onChange={(e) => onDateChange(e.target.value)}
+          aria-label="日付"
+          className="w-full rounded-lg px-2 py-2.5 outline-none"
+          style={{ fontSize: "16px", border: "1px solid var(--border)", color: "var(--ink)", backgroundColor: "var(--bg-card)" }}
+        />
+        <button
+          type="button"
+          onClick={() => onPaymentChange(paymentMethod === "cash" ? "credit" : "cash")}
+          className="rounded-lg px-2 py-2.5 text-xs font-bold"
+          style={{ backgroundColor: "var(--accent-light)", color: "var(--accent-dark)", border: "1px solid var(--accent-muted)" }}
+        >
+          {PAYMENT_METHODS.find((pm) => pm.key === paymentMethod)?.icon} {PAYMENT_METHODS.find((pm) => pm.key === paymentMethod)?.label}
+        </button>
+        <input
+          type="text"
+          value={memo}
+          onChange={(e) => onMemoChange(e.target.value)}
+          placeholder="メモ"
+          aria-label="メモ"
+          className="w-full rounded-lg px-3 py-2.5 outline-none"
+          style={{ fontSize: "16px", border: "1px solid var(--border)", color: "var(--ink)", backgroundColor: "var(--bg-card)" }}
+        />
       </div>
 
       <div className="grid grid-cols-4 gap-1.5">
@@ -1126,9 +1127,9 @@ function EntryFormContent({
             onClick={() => onCalcPress(k)}
             className={`font-amount font-bold select-none active:scale-[0.97] ${span === 3 ? "col-span-3" : ""}`}
             style={{
-              height: "46px",
-              borderRadius: "4px",
-              fontSize: "16px",
+              height: "44px",
+              borderRadius: "8px",
+              fontSize: "20px",
               backgroundColor:
                 s === "n" ? "var(--bg-card)" :
                 s === "f" ? "var(--warm-gray-100)" :
@@ -1152,7 +1153,11 @@ function EntryFormContent({
       {stickySave ? (
         <div
           className="sticky bottom-0 -mx-4 px-4 pt-2"
-          style={{ backgroundColor: "var(--bg)", paddingBottom: "calc(16px + env(safe-area-inset-bottom))" }}
+          style={{
+            bottom: stickySaveOffset || "0px",
+            backgroundColor: "var(--bg)",
+            paddingBottom: "calc(14px + env(safe-area-inset-bottom))",
+          }}
         >
           {saveButton}
         </div>
@@ -1199,12 +1204,13 @@ function EntrySheet({
   return (
     <div className="fixed inset-0 bg-black/40 z-[80] flex items-end justify-center" onClick={onClose}>
       <div
-        className="w-full max-w-lg max-h-[calc(100dvh-12px)] overflow-y-auto rounded-t-lg p-4 pb-0 space-y-4"
+        className="w-full max-w-lg max-h-[calc(100dvh-10px)] overflow-y-auto rounded-t-[22px] px-4 pb-0 pt-3 space-y-3"
         style={{ backgroundColor: "var(--bg)", border: "1px solid var(--border)", borderBottom: "none" }}
         onClick={(e) => e.stopPropagation()}
       >
+        <div className="mx-auto h-1 w-10 rounded-full" style={{ backgroundColor: "var(--warm-gray-200)" }} />
         <div className="flex items-center justify-between">
-          <h2 className="text-base font-medium" style={{ color: "var(--ink)" }}>{editing ? "支出を編集" : "支出を入力"}</h2>
+          <h2 className="text-base font-bold" style={{ color: "var(--ink)" }}>{editing ? "支出を編集" : "支出を入力"}</h2>
           <button onClick={onClose} className="text-sm px-2 py-1" style={{ color: "var(--warm-gray-400)" }}>閉じる</button>
         </div>
 
