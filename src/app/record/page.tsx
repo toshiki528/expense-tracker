@@ -682,7 +682,7 @@ function LedgerItemRow({ item, onEdit, onDelete }: { item: LedgerItem; onEdit: (
         </div>
       </div>
       <div className="flex shrink-0 items-stretch">
-        <div className="flex w-[74px] items-center justify-end px-3">
+        <div className="flex w-[68px] items-center justify-end px-2">
           <p className="font-amount text-sm font-bold" style={{ color: "var(--ink)" }}>¥{item.amount.toLocaleString()}</p>
         </div>
         {isManual && (
@@ -692,7 +692,7 @@ function LedgerItemRow({ item, onEdit, onDelete }: { item: LedgerItem; onEdit: (
               onClick={onEdit}
               disabled={!item.editable}
               aria-label="編集"
-              className="grid w-12 place-items-center text-base font-bold disabled:opacity-40"
+              className="grid w-10 place-items-center text-base font-bold disabled:opacity-40"
               style={{ backgroundColor: "var(--accent)", color: "#FFFFFF" }}
             >
               ✎
@@ -702,10 +702,10 @@ function LedgerItemRow({ item, onEdit, onDelete }: { item: LedgerItem; onEdit: (
               onClick={onDelete}
               disabled={!item.deleteable}
               aria-label="削除"
-              className="grid w-12 place-items-center text-base font-bold disabled:opacity-40"
+              className="grid w-10 place-items-center text-base font-bold disabled:opacity-40"
               style={{ backgroundColor: "var(--error)", color: "#FFFFFF" }}
             >
-              🗑
+              ×
             </button>
           </>
         )}
@@ -1145,7 +1145,7 @@ function EntryFormContent({
 
       {stickySave ? (
         <div
-          className="-mx-4 px-4 pt-1.5"
+          className={stickySaveOffset ? "px-5 pt-1.5" : "-mx-4 px-4 pt-1.5"}
           style={{
             position: stickySaveOffset ? "fixed" : "sticky",
             bottom: stickySaveOffset || "0px",
@@ -1153,6 +1153,7 @@ function EntryFormContent({
             transform: stickySaveOffset ? "translateX(-50%)" : undefined,
             width: stickySaveOffset ? "min(100vw, 512px)" : undefined,
             zIndex: stickySaveOffset ? 60 : undefined,
+            boxSizing: "border-box",
             backgroundColor: "var(--bg)",
             paddingBottom: "calc(10px + env(safe-area-inset-bottom))",
           }}
